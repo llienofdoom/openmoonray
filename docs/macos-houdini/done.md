@@ -2,6 +2,23 @@
 
 Completed steps in the Moonray macOS build process.
 
+## Fork-Based Workflow Migration — COMPLETE ✅ (2026-07-18)
+
+Replaced the patch-shuffle model (uncommitted edits + `.patch` files here) with **committed
+source in three personal forks** under `github.com/llienofdoom`, all on branch `macos-houdini`:
+`openmoonray` (superproject), `hdMoonray`, `moonray_dcc_plugins`. The other 17 submodules track
+`OpenMoonRay/*@main`; `moonray` core is not forked. `.gitmodules` rewritten to absolute URLs;
+`BUILD_QT_APPS=NO` (Houdini-only); docs folded into `openmoonray/docs/macos-houdini/{macos,general}/`;
+a central `CLAUDE.md` + `.claude/skills/{build-houdini,render-test}` added (submodule forks carry
+one-line pointer stubs). Reconciliation caught undocumented drift (the `hdMoonray` "sceneobject-ref"
+feature) and separated hotl `*.hda.orig` noise (now git-ignored). Verified: clean
+`--recurse-submodules -b macos-houdini` clone resolves all 19 submodules with zero 404s and no patch
+step; forked-module content byte-identical to the build tree. **This repo is retained as the
+research/history archive.** Full detail: `docs/research/fork-based-workflow.md`.
+
+Not yet run: a full from-scratch deps build + compile of the fork (multi-hour; committed bytes are
+identical to the already-built-and-render-verified tree).
+
 ## Houdini TAB Menu Consolidation — COMPLETE ✅ (2026-07-07)
 
 Collapsed the four redundant Moonray VOP TAB-menu placements (`DW Moonray`,

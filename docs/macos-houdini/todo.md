@@ -1,5 +1,15 @@
 # TODO
 
+## Fork Migration — DONE (2026-07-18)
+
+Work moved from the patch-shuffle model to committed source in `github.com/llienofdoom` forks
+(`openmoonray`/`hdMoonray`/`moonray_dcc_plugins`, branch `macos-houdini`). See
+`docs/research/fork-based-workflow.md` and the `done.md` entry. Existing items below are
+preserved as historical record. Remaining verification:
+
+- [ ] Full from-scratch deps build + compile of the fork on a clean machine (multi-hour; the
+      git/source resolution is verified, byte-identical to the built tree — this is the final sign-off).
+
 ## Pre-Build Decisions (needs your input)
 
 - [x] **Disk space:** 94GB free on /Applications — sufficient for full build. ✅
