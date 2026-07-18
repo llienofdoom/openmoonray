@@ -40,6 +40,12 @@ export MOONRAY_CLASS_PATH=${omr_root}/shader_json
 export PXR_PLUGINPATH_NAME=${omr_root}/plugin/pxr:${PXR_PLUGINPATH_NAME}
 export PXR_PLUGIN_PATH=${omr_root}/plugin/pxr:${PXR_PLUGIN_PATH} # for legacy DWA USD builds
 
+# Qt platform and image-format plugins are in installs/plugins/ alongside the
+# Qt frameworks in installs/lib/. Without these paths moonray_gui aborts
+# immediately with "Could not find the Qt platform plugin cocoa".
+export QT_QPA_PLATFORM_PLUGIN_PATH=${install_root}/plugins/platforms
+export QT_PLUGIN_PATH=${install_root}/plugins
+
 # create shader descriptions if they don't exist
 if [ ! -d "${omr_root}/shader_json" ]
 then

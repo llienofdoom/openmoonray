@@ -419,14 +419,15 @@ list(APPEND _IMPORT_CHECK_TARGETS usdImagingGL )
 list(APPEND _IMPORT_CHECK_FILES_FOR_usdImagingGL "${_LIB_PREFIX}/libpxr_usdImagingGL.dylib" )
 
 # Import target "usdRiImaging" for configuration "Release"
+# Houdini 20.5 renamed this library to libpxr_usdRiPxrImaging.dylib
 set_property(TARGET usdRiImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(usdRiImaging PROPERTIES
-  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiImaging.dylib"
-  IMPORTED_SONAME_RELEASE "libpxr_usdRiImaging.dylib"
+  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiPxrImaging.dylib"
+  IMPORTED_SONAME_RELEASE "libpxr_usdRiPxrImaging.dylib"
   )
 
 list(APPEND _IMPORT_CHECK_TARGETS usdRiImaging )
-list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiImaging.dylib" )
+list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiPxrImaging.dylib" )
 
 # Import target "usdSkelImaging" for configuration "Release"
 set_property(TARGET usdSkelImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)

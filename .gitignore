@@ -65,3 +65,7 @@ moonray/moonray_tools
 
 # gha created files
 .ci_githooks
+
+# macOS Finder + local test render artifacts
+.DS_Store
+testdata/*.exr

@@ -23,6 +23,11 @@ set(THIS_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # User configurable settings
 set(InstallRoot ${rootSrcDir}/../../../../installs CACHE FILEPATH "Install root for dependencies")
+# Normalize the path so autotools --prefix= receives a canonical absolute path
+# with no .. components. Without this, configure/make-based deps (OpenSSL, libcurl,
+# log4cplus, etc.) bake the raw ../../../.. string into their dylib install names,
+# which breaks dyld on any machine that lacks the source/ directory tree.
+get_filename_component(InstallRoot "${InstallRoot}" ABSOLUTE)
 set(PythonVer 3.9.6 CACHE STRING "Python version (n.m), e.g. 3.6")
 set(PythonRoot /usr CACHE FILEPATH "Location of Python install")
 
