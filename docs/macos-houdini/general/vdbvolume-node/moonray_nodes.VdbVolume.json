@@ -1,0 +1,154 @@
+{
+ "VdbVolume": {
+  "moonray_name": "VdbVolume",
+  "moonray_type": "Volume",
+  "parms": {
+   "label": {
+    "moonray_name": "label",
+    "moonray_type": "String",
+    "default_value": [
+     ""
+    ],
+    "houdini_name": "label",
+    "houdini_label": "Label",
+    "order": 0,
+    "help": "label used in light aovs"
+   },
+   "bake_resolution_mode": {
+    "moonray_name": "bake_resolution_mode",
+    "moonray_type": "Int",
+    "default_value": [
+     0
+    ],
+    "houdini_name": "bake_resolution_mode",
+    "houdini_label": "bake resolution mode",
+    "order": 1,
+    "help": "Method to specify grid resolution of baked density grid.  Choices are:\n\t\t\"default\": For shaders that are bound to vdb volumes, use vdb resolution.\n\t\t\t\t\t\tFor shaders that are bounds to mesh geometries use 100 divisions\n\t\t\"divisions\": Specify number of divisions.\n\t\t\"voxel size\": Specify voxel size.",
+    "menu": [
+     "default",
+     "divisions",
+     "voxel size"
+    ],
+    "menu_values": [
+     "0",
+     "1",
+     "2"
+    ]
+   },
+   "bake_divisions": {
+    "moonray_name": "bake_divisions",
+    "moonray_type": "Int",
+    "default_value": [
+     100
+    ],
+    "houdini_name": "bake_divisions",
+    "houdini_label": "Bake Divisions",
+    "order": 2,
+    "help": "Divide widest axis by this many divisions"
+   },
+   "bake_voxel_size": {
+    "moonray_name": "bake_voxel_size",
+    "moonray_type": "Float",
+    "default_value": [
+     10.0
+    ],
+    "houdini_name": "bake_voxel_size",
+    "houdini_label": "Bake Voxel Size",
+    "order": 3,
+    "help": "Size of voxel in world space"
+   },
+   "surface_opacity_threshold": {
+    "moonray_name": "surface_opacity_threshold",
+    "moonray_type": "Float",
+    "default_value": [
+     0.5
+    ],
+    "houdini_name": "surface_opacity_threshold",
+    "houdini_label": "Surface Opacity Threshold",
+    "order": 4,
+    "help": "Accumulated opacity that's considered the 'surface' for computing surface position and Z"
+   },
+   "opacity_gain_mult": {
+    "moonray_name": "opacity_gain_mult",
+    "moonray_type": "Rgb",
+    "default_value": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "houdini_name": "opacity_gain_mult",
+    "houdini_label": "opacity gain mult",
+    "order": 5,
+    "aliases": [
+     "opacity gain mult"
+    ],
+    "bindable": true,
+    "help": "A multiplier applied to the volume density"
+   },
+   "color_mult": {
+    "moonray_name": "color_mult",
+    "moonray_type": "Rgb",
+    "default_value": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "houdini_name": "color_mult",
+    "houdini_label": "color mult",
+    "order": 6,
+    "aliases": [
+     "color mult"
+    ],
+    "bindable": true,
+    "help": "The albedo of the volume"
+   },
+   "incandescence_gain_mult": {
+    "moonray_name": "incandescence_gain_mult",
+    "moonray_type": "Rgb",
+    "default_value": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "houdini_name": "incandescence_gain_mult",
+    "houdini_label": "incandescence gain mult",
+    "order": 7,
+    "aliases": [
+     "incandescence gain mult"
+    ],
+    "bindable": true,
+    "help": "A multiplier applied to the volume emission"
+   },
+   "anisotropy": {
+    "moonray_name": "anisotropy",
+    "moonray_type": "Float",
+    "default_value": [
+     0.0
+    ],
+    "houdini_name": "anisotropy",
+    "houdini_label": "Anisotropy",
+    "order": 8,
+    "bindable": true,
+    "help": "Value in the interval [-1,1] that defines how foward (1) or backward (-1) scattering the volume is.  A value of 0.0 indicates an isotropic volume."
+   }
+  },
+  "folders_sorted": [
+   "Volume Baking",
+   "Volume"
+  ],
+  "folders_with_parms": {
+   "Volume": [
+    "surface_opacity_threshold",
+    "opacity_gain_mult",
+    "color_mult",
+    "incandescence_gain_mult",
+    "anisotropy"
+   ],
+   "Volume Baking": [
+    "bake_resolution_mode",
+    "bake_divisions",
+    "bake_voxel_size"
+   ]
+  }
+ }
+}

@@ -1,0 +1,43 @@
+#usda 1.0
+(
+    defaultPrim = "world"
+    upAxis = "Y"
+    startTimeCode = 1
+    endTimeCode = 1
+)
+
+def Xform "world"
+{
+    def Camera "cam"
+    {
+        float focalLength = 50
+        double3 xformOp:translate = (0, 2, 10)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+    }
+
+    def Mesh "floor"
+    {
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-5, 0, -5), (5, 0, -5), (5, 0, 5), (-5, 0, 5)]
+    }
+
+    def Mesh "emitter"
+    {
+        int[] faceVertexCounts = [4]
+        int[] faceVertexIndices = [0, 1, 2, 3]
+        point3f[] points = [(-1, 3, -1), (1, 3, -1), (1, 3, 1), (-1, 3, 1)]
+        # Emitter MUST be invisible: MoonRay rejects a MeshLight reference geometry
+        # that is in the render layer ("cannot be referenced ... when it is in Layer").
+        token visibility = "invisible"
+    }
+
+    def SphereLight "meshlight"
+    {
+        uniform token moonray:class = "MeshLight"
+        string moonray:geometry = "/world/emitter"
+        rel inputs:geometry = </world/emitter>
+        float inputs:radius = 0.01
+        float inputs:intensity = 5
+    }
+}

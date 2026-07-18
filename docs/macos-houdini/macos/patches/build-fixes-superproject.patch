@@ -1,0 +1,611 @@
+diff --git a/CMakeMacOSPresets.json b/CMakeMacOSPresets.json
+index f13d05e..dd36fb4 100644
+--- a/CMakeMacOSPresets.json
++++ b/CMakeMacOSPresets.json
+@@ -34,15 +34,16 @@
+             "inherits": "macos-environment",
+             "environment": {
+                 "PREFIX_PXR"                : "${sourceParentDir}/building/macOS/pxr-houdini",
+-                "HOUDINI_INSTALL_DIR"       : "/Applications/Houdini/Houdini20.0.751",
++                "HOUDINI_INSTALL_DIR"       : "/Applications/Houdini/Houdini20.5.939",
+                 "PXR_LIB_PREFIX"            : "$env{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Libraries",
+                 "PXR_INCLUDE_PREFIX"        : "$env{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Resources/toolkit/include",
+                 "PXR_DEPS_PREFIX"           : "$env{DEPS_ROOT}",
+-                "PXR_BOOST_PYTHON_LIB"      : "$env{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Libraries/libhboost_python39-mt-a64.dylib"
++                "PXR_BOOST_PYTHON_LIB"      : "$env{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Libraries/libhboost_python311-mt-a64.dylib"
+             },
+             "cacheVariables": {
+-                "CMAKE_PREFIX_PATH": "$env{DEPS_ROOT};$env{PREFIX_PXR}",
+-                "MOONRAY_USE_HOUDINI": "TRUE"
++                "CMAKE_PREFIX_PATH": "$env{PREFIX_PXR};$env{DEPS_ROOT}",
++                "MOONRAY_USE_HOUDINI": "TRUE",
++                "CMAKE_CXX_FLAGS": "-isystem $env{PXR_INCLUDE_PREFIX}"
+             }
+         },
+         {
+@@ -52,7 +53,7 @@
+             "binaryDir": "$env{BUILD_DIR}",
+             "cacheVariables": {
+                 "CMAKE_BUILD_TYPE": "Release",
+-                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/installs/openmoonray"
++                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/installs/openmoonray-standalone"
+             },
+             "generator": "Xcode"
+         },
+@@ -63,7 +64,7 @@
+             "binaryDir": "$env{BUILD_DIR}",
+             "cacheVariables": {
+                 "CMAKE_BUILD_TYPE": "Release",
+-                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/installs/openmoonray"
++                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/installs/openmoonray-houdini"
+             },
+             "generator": "Xcode"
+         }
+diff --git a/building/macOS/CMakeLists.txt b/building/macOS/CMakeLists.txt
+index 12ef7ce..7a3838b 100644
+--- a/building/macOS/CMakeLists.txt
++++ b/building/macOS/CMakeLists.txt
+@@ -23,6 +23,11 @@ set(THIS_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+ 
+ # User configurable settings
+ set(InstallRoot ${rootSrcDir}/../../../../installs CACHE FILEPATH "Install root for dependencies")
++# Normalize the path so autotools --prefix= receives a canonical absolute path
++# with no .. components. Without this, configure/make-based deps (OpenSSL, libcurl,
++# log4cplus, etc.) bake the raw ../../../.. string into their dylib install names,
++# which breaks dyld on any machine that lacks the source/ directory tree.
++get_filename_component(InstallRoot "${InstallRoot}" ABSOLUTE)
+ set(PythonVer 3.9.6 CACHE STRING "Python version (n.m), e.g. 3.6")
+ set(PythonRoot /usr CACHE FILEPATH "Location of Python install")
+ 
+diff --git a/building/macOS/pxr-houdini/pxrTargets-release.cmake b/building/macOS/pxr-houdini/pxrTargets-release.cmake
+index ae3a89d..54cd559 100644
+--- a/building/macOS/pxr-houdini/pxrTargets-release.cmake
++++ b/building/macOS/pxr-houdini/pxrTargets-release.cmake
+@@ -419,14 +419,15 @@ list(APPEND _IMPORT_CHECK_TARGETS usdImagingGL )
+ list(APPEND _IMPORT_CHECK_FILES_FOR_usdImagingGL "${_LIB_PREFIX}/libpxr_usdImagingGL.dylib" )
+ 
+ # Import target "usdRiImaging" for configuration "Release"
++# Houdini 20.5 renamed this library to libpxr_usdRiPxrImaging.dylib
+ set_property(TARGET usdRiImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+ set_target_properties(usdRiImaging PROPERTIES
+-  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiImaging.dylib"
+-  IMPORTED_SONAME_RELEASE "libpxr_usdRiImaging.dylib"
++  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiPxrImaging.dylib"
++  IMPORTED_SONAME_RELEASE "libpxr_usdRiPxrImaging.dylib"
+   )
+ 
+ list(APPEND _IMPORT_CHECK_TARGETS usdRiImaging )
+-list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiImaging.dylib" )
++list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiPxrImaging.dylib" )
+ 
+ # Import target "usdSkelImaging" for configuration "Release"
+ set_property(TARGET usdSkelImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
+diff --git a/building/macOS/pxr-houdini/pxrTargets.cmake b/building/macOS/pxr-houdini/pxrTargets.cmake
+index f3cd6fe..9369ceb 100644
+--- a/building/macOS/pxr-houdini/pxrTargets.cmake
++++ b/building/macOS/pxr-houdini/pxrTargets.cmake
+@@ -17,8 +17,8 @@ cmake_policy(VERSION 2.6...3.21)
+ # Commands may need to know the format version.
+ set(CMAKE_IMPORT_FILE_VERSION 1)
+ 
+-SET(HPYTHONLIB $ENV{HOUDINI_INSTALL_DIR}/Frameworks/Python.framework/Versions/3.9/lib/libpython3.9.dylib)
+-SET(HPYTHONINC $ENV{HOUDINI_INSTALL_DIR}/Frameworks/Python.framework/Versions/3.9/include/python3.9)
++SET(HPYTHONLIB $ENV{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Resources/Frameworks/Python.framework/Versions/3.11/lib/libpython3.11.dylib)
++SET(HPYTHONINC $ENV{HOUDINI_INSTALL_DIR}/Frameworks/Houdini.framework/Versions/Current/Resources/Frameworks/Python.framework/Versions/3.11/include/python3.11)
+ 
+ # Protect against multiple inclusion, which would fail when already imported targets are added once more.
+ set(_targetsDefined)
+@@ -59,7 +59,7 @@ add_library(arch SHARED IMPORTED)
+ 
+ set_target_properties(arch PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+ #  INTERFACE_LINK_LIBRARIES "dl;${_DEPS_PREFIX}/lib/libm${CMAKE_SHARED_LIBRARY_SUFFIX}"
+ )
+ 
+@@ -68,9 +68,9 @@ add_library(tf SHARED IMPORTED)
+ 
+ set_target_properties(tf PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX};${HPYTHONINC}"
++  INTERFACE_INCLUDE_DIRECTORIES "${HPYTHONINC}"
+   INTERFACE_LINK_LIBRARIES "arch;${HPYTHONLIB};${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${HPYTHONINC};${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${HPYTHONINC};${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target gf
+@@ -78,7 +78,7 @@ add_library(gf SHARED IMPORTED)
+ 
+ set_target_properties(gf PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf"
+ )
+ 
+@@ -87,7 +87,7 @@ add_library(js SHARED IMPORTED)
+ 
+ set_target_properties(js PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -97,9 +97,9 @@ add_library(trace SHARED IMPORTED)
+ 
+ set_target_properties(trace PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;js;tf;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target work
+@@ -107,7 +107,7 @@ add_library(work SHARED IMPORTED)
+ 
+ set_target_properties(work PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;trace;${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -117,9 +117,9 @@ add_library(plug SHARED IMPORTED)
+ 
+ set_target_properties(plug PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf;js;trace;work;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target vt
+@@ -127,9 +127,9 @@ add_library(vt SHARED IMPORTED)
+ 
+ set_target_properties(vt PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf;gf;trace;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target ar
+@@ -137,7 +137,7 @@ add_library(ar SHARED IMPORTED)
+ 
+ set_target_properties(ar PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf;plug;vt;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -147,7 +147,7 @@ add_library(kind SHARED IMPORTED)
+ 
+ set_target_properties(kind PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;plug"
+ )
+ 
+@@ -156,7 +156,7 @@ add_library(sdf SHARED IMPORTED)
+ 
+ set_target_properties(sdf PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf;gf;trace;vt;work;ar;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -166,7 +166,7 @@ add_library(ndr SHARED IMPORTED)
+ 
+ set_target_properties(ndr PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;plug;vt;work;ar;sdf;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -176,7 +176,7 @@ add_library(sdr SHARED IMPORTED)
+ 
+ set_target_properties(sdr PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;ar;ndr;sdf;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -186,9 +186,9 @@ add_library(pcp SHARED IMPORTED)
+ 
+ set_target_properties(pcp PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;trace;vt;sdf;work;ar;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target usd
+@@ -196,9 +196,9 @@ add_library(usd SHARED IMPORTED)
+ 
+ set_target_properties(usd PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;kind;pcp;sdf;ar;plug;tf;trace;vt;work;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target usdGeom
+@@ -206,9 +206,9 @@ add_library(usdGeom SHARED IMPORTED)
+ 
+ set_target_properties(usdGeom PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "js;tf;plug;vt;sdf;trace;usd;work;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target usdVol
+@@ -216,7 +216,7 @@ add_library(usdVol SHARED IMPORTED)
+ 
+ set_target_properties(usdVol PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;usd;usdGeom"
+ )
+ 
+@@ -225,7 +225,7 @@ add_library(usdMedia SHARED IMPORTED)
+ 
+ set_target_properties(usdMedia PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;sdf;usd;usdGeom"
+ )
+ 
+@@ -234,7 +234,7 @@ add_library(usdShade SHARED IMPORTED)
+ 
+ set_target_properties(usdShade PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;sdf;ndr;sdr;usd;usdGeom"
+ )
+ 
+@@ -243,7 +243,7 @@ add_library(usdLux SHARED IMPORTED)
+ 
+ set_target_properties(usdLux PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;ndr;sdf;usd;usdGeom;usdShade"
+ )
+ 
+@@ -252,7 +252,7 @@ add_library(usdRender SHARED IMPORTED)
+ 
+ set_target_properties(usdRender PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "gf;tf;usd;usdGeom"
+ )
+ 
+@@ -261,7 +261,7 @@ add_library(usdHydra SHARED IMPORTED)
+ 
+ set_target_properties(usdHydra PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;usd;usdShade"
+ )
+ 
+@@ -270,7 +270,7 @@ add_library(usdRi SHARED IMPORTED)
+ 
+ set_target_properties(usdRi PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;sdf;usd;usdShade;usdGeom;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -280,9 +280,9 @@ add_library(usdSkel SHARED IMPORTED)
+ 
+ set_target_properties(usdSkel PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;gf;tf;trace;vt;work;sdf;usd;usdGeom;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target usdUI
+@@ -290,7 +290,7 @@ add_library(usdUI SHARED IMPORTED)
+ 
+ set_target_properties(usdUI PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;vt;sdf;usd"
+ )
+ 
+@@ -299,7 +299,7 @@ add_library(usdUtils SHARED IMPORTED)
+ 
+ set_target_properties(usdUtils PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;tf;gf;sdf;usd;usdGeom;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -309,9 +309,9 @@ add_library(usdPhysics SHARED IMPORTED)
+ 
+ set_target_properties(usdPhysics PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "js;tf;plug;vt;sdf;trace;usd;usdGeom;usdShade;work;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+-  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include;${_DEPS_PREFIX}/include"
++  INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+ 
+ # Create imported target garch
+@@ -319,7 +319,7 @@ add_library(garch SHARED IMPORTED)
+ 
+ set_target_properties(garch PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+ #  INTERFACE_LINK_LIBRARIES "arch;tf;${_DEPS_PREFIX}/lib/libSM.dylib;${_DEPS_PREFIX}/lib/libICE.dylib;${_DEPS_PREFIX}/lib/libX11.dylib;${_DEPS_PREFIX}/lib/libXext.dylib;${_DEPS_PREFIX}/lib/libGL.dylib"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -329,7 +329,7 @@ add_library(hf SHARED IMPORTED)
+ 
+ set_target_properties(hf PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "plug;tf;trace"
+ )
+ 
+@@ -338,7 +338,7 @@ add_library(hio SHARED IMPORTED)
+ 
+ set_target_properties(hio PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;js;plug;tf;vt;trace;ar;hf"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -348,7 +348,7 @@ add_library(cameraUtil SHARED IMPORTED)
+ 
+ set_target_properties(cameraUtil PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;gf"
+ )
+ 
+@@ -357,7 +357,7 @@ add_library(pxOsd SHARED IMPORTED)
+ 
+ set_target_properties(pxOsd PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;gf;vt;${_DEPS_PREFIX}/lib/libosdCPU${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libosdGPU${CMAKE_SHARED_LIBRARY_SUFFIX};${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -367,7 +367,7 @@ add_library(glf SHARED IMPORTED)
+ 
+ set_target_properties(glf PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+ #  INTERFACE_LINK_LIBRARIES "ar;arch;garch;gf;hf;hio;js;plug;tf;trace;sdf;${_BOOST_PYTHON_LIB};${_DEPS_PREFIX}/lib/libGL${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libSM${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libICE${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libX11${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libXext${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -377,7 +377,7 @@ add_library(hgi SHARED IMPORTED)
+ 
+ set_target_properties(hgi PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "gf;plug;tf"
+ )
+ 
+@@ -386,7 +386,7 @@ add_library(hgiGL SHARED IMPORTED)
+ 
+ set_target_properties(hgiGL PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "arch;garch;hgi;tf;trace"
+ )
+ 
+@@ -395,7 +395,7 @@ add_library(hgiInterop SHARED IMPORTED)
+ 
+ set_target_properties(hgiInterop PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "gf;tf;hgi;vt;garch"
+ )
+ 
+@@ -404,7 +404,7 @@ add_library(hd SHARED IMPORTED)
+ 
+ set_target_properties(hd PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "plug;tf;trace;vt;work;sdf;cameraUtil;hf;pxOsd;${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -414,7 +414,7 @@ add_library(hdSt SHARED IMPORTED)
+ 
+ set_target_properties(hdSt PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "hio;garch;glf;hd;hgiGL;hgiInterop;sdr;tf;trace;${_DEPS_PREFIX}/lib/libosdCPU${CMAKE_SHARED_LIBRARY_SUFFIX};${_DEPS_PREFIX}/lib/libosdGPU${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -424,7 +424,7 @@ add_library(hdx SHARED IMPORTED)
+ 
+ set_target_properties(hdx PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "plug;tf;vt;gf;work;garch;glf;pxOsd;hd;hdSt;hgi;hgiInterop;cameraUtil;sdf"
+ )
+ 
+@@ -433,7 +433,7 @@ add_library(usdImaging SHARED IMPORTED)
+ 
+ set_target_properties(usdImaging PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "gf;tf;plug;trace;vt;work;hd;pxOsd;sdf;usd;usdGeom;usdLux;usdShade;usdVol;ar;${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -453,7 +453,7 @@ add_library(usdRiImaging SHARED IMPORTED)
+ 
+ set_target_properties(usdRiImaging PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "gf;tf;plug;trace;vt;work;hd;pxOsd;sdf;usd;usdGeom;usdLux;usdShade;usdImaging;usdVol;ar;${_DEPS_PREFIX}/lib/libtbb${CMAKE_SHARED_LIBRARY_SUFFIX}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -463,7 +463,7 @@ add_library(usdSkelImaging SHARED IMPORTED)
+ 
+ set_target_properties(usdSkelImaging PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "hio;hd;usdImaging;usdSkel"
+ )
+ 
+@@ -472,7 +472,7 @@ add_library(usdVolImaging SHARED IMPORTED)
+ 
+ set_target_properties(usdVolImaging PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "usdImaging"
+ )
+ 
+@@ -481,7 +481,7 @@ add_library(usdAppUtils SHARED IMPORTED)
+ 
+ set_target_properties(usdAppUtils PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "garch;gf;hio;sdf;tf;usd;usdGeom;usdImagingGL;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+@@ -491,7 +491,7 @@ add_library(usdviewq SHARED IMPORTED)
+ 
+ set_target_properties(usdviewq PROPERTIES
+   INTERFACE_COMPILE_DEFINITIONS "PXR_PYTHON_ENABLED=1"
+-  INTERFACE_INCLUDE_DIRECTORIES "${_INCLUDE_PREFIX}"
++  INTERFACE_INCLUDE_DIRECTORIES ""
+   INTERFACE_LINK_LIBRARIES "tf;usd;usdGeom;${_BOOST_PYTHON_LIB}"
+   INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${_DEPS_PREFIX}/include"
+ )
+diff --git a/scripts/macOS/setupHoudini.sh b/scripts/macOS/setupHoudini.sh
+index 68ac25f..e045b59 100644
+--- a/scripts/macOS/setupHoudini.sh
++++ b/scripts/macOS/setupHoudini.sh
+@@ -1,14 +1,46 @@
+-omr_install_dir=/Applications/MoonRay/installs/openmoonray
+-
+-# save/restore PYTHONPATH, since Houdini seems to reject python3.9
+-OLDPP=${PYTHONPATH}
+-source ${omr_install_dir}/scripts/setup.sh
+-export PYTHONPATH=${OLDPP}
+-
+-export REL=${omr_install_dir}
+-export RDL2_DSO_PATH=${omr_install_dir}/rdl2dso.proxy:${omr_install_dir}/rdl2dso
+-export MOONRAY_CLASS_PATH=${omr_install_dir}/shader_json
+-export ARRAS_SESSION_PATH=${omr_install_dir}/sessions
+-PXR_PLUGINPATH_NAME=${omr_install_dir}/plugin/pxr
+-#export HOUDINI_DSO_ERROR=5
+-export HOUDINI_PATH=/Applications/Houdini/Houdini20.0.751/Frameworks/Houdini.framework/Versions/Current/Resources/houdini:${omr_install_dir}/houdini/:${omr_install_dir}/plugin/houdini
++omr_install_dir=/Applications/MoonRay/installs/openmoonray-houdini
++install_root=/Applications/MoonRay/installs
++houdini_resources=/Applications/Houdini/Houdini20.5.939/Frameworks/Houdini.framework/Versions/Current/Resources/houdini
++
++source "${omr_install_dir}/scripts/setup.sh"
++
++# Remove standalone USD Python bindings from PYTHONPATH — they are built against
++# Python 3.9 and will crash Houdini's Python 3.11 if left on the path.
++# Houdini provides its own pxr Python bindings compiled against Python 3.11.
++export PYTHONPATH=$(echo "${PYTHONPATH}" | tr ':' '\n' | grep -v "^${install_root}/lib/python$" | grep -v "^${install_root}/lib64/python3.9" | tr '\n' ':' | sed 's/:$//')
++
++export REL="${omr_install_dir}"
++export RDL2_DSO_PATH="${omr_install_dir}/rdl2dso.proxy:${omr_install_dir}/rdl2dso"
++export MOONRAY_CLASS_PATH="${omr_install_dir}/shader_json"
++export ARRAS_SESSION_PATH="${omr_install_dir}/sessions"
++
++prepend_unique_path() {
++    local add_path="$1"
++    local current="${2:-}"
++    case ":${current}:" in
++        *":${add_path}:"*) echo "${current}" ;;
++        *)
++            if [ -n "${current}" ]; then
++                echo "${add_path}:${current}"
++            else
++                echo "${add_path}"
++            fi
++            ;;
++    esac
++}
++
++# Set both env vars Houdini uses for USD plugin search paths (Houdini version
++# dependent — set both to be safe across upgrades).
++export PXR_PLUGINPATH_NAME="$(prepend_unique_path "${omr_install_dir}/plugin/pxr" "${PXR_PLUGINPATH_NAME:-}")"
++export PXR_PLUGIN_PATH="$(prepend_unique_path "${omr_install_dir}/plugin/pxr" "${PXR_PLUGIN_PATH:-}")"
++
++# Layer MoonRay paths onto HOUDINI_PATH. If HOUDINI_PATH is already set
++# (e.g. user sourced houdini_setup), we prepend without clobbering.
++# Otherwise include the Houdini resources path directly so Houdini can
++# find its own packages.
++if [ -n "${HOUDINI_PATH:-}" ]; then
++    export HOUDINI_PATH="$(prepend_unique_path "${omr_install_dir}/plugin/houdini" "${HOUDINI_PATH}")"
++    export HOUDINI_PATH="$(prepend_unique_path "${omr_install_dir}/houdini" "${HOUDINI_PATH}")"
++else
++    export HOUDINI_PATH="${omr_install_dir}/houdini:${omr_install_dir}/plugin/houdini:${houdini_resources}"
++fi
+diff --git a/scripts/setup.sh b/scripts/setup.sh
+index 999594d..ef03fee 100644
+--- a/scripts/setup.sh
++++ b/scripts/setup.sh
+@@ -40,6 +40,12 @@ export MOONRAY_CLASS_PATH=${omr_root}/shader_json
+ export PXR_PLUGINPATH_NAME=${omr_root}/plugin/pxr:${PXR_PLUGINPATH_NAME}
+ export PXR_PLUGIN_PATH=${omr_root}/plugin/pxr:${PXR_PLUGIN_PATH} # for legacy DWA USD builds
+ 
++# Qt platform and image-format plugins are in installs/plugins/ alongside the
++# Qt frameworks in installs/lib/. Without these paths moonray_gui aborts
++# immediately with "Could not find the Qt platform plugin cocoa".
++export QT_QPA_PLATFORM_PLUGIN_PATH=${install_root}/plugins/platforms
++export QT_PLUGIN_PATH=${install_root}/plugins
++
+ # create shader descriptions if they don't exist
+ if [ ! -d "${omr_root}/shader_json" ]
+ then

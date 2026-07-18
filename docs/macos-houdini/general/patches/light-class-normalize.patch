@@ -1,0 +1,73 @@
+--- moonray_Light.ds.orig	2026-07-07 14:17:12
++++ moonray_Light.ds	2026-07-07 14:26:48
+@@ -7,7 +7,7 @@
+         label   "moonray:class"
+         type    string
+         invisible
+-        default { "set" }
++        default { "none" }
+         menujoin {
+             "set"           "Set Or Create"
+             "setexisting"   "Set if Exists"
+@@ -307,8 +307,8 @@
+             name    "xn__moonraynormalized_control_thb"
+             label   "moonray:normalized"
+             type    string
+-            default { "none" }
+-            hidewhen "{ primtype != UsdLuxCylinderLight primtype != UsdLuxDiskLight primtype != UsdLuxDistantLight primtype != UsdLuxGeometryLight primtype != UsdLuxRectLight primtype != UsdLuxSphereLight primtype != UsdLuxDiskLight createprims == on }"
++            default { "set" }
++            hidewhen "{ primtype != UsdLuxDistantLight createprims == on }"
+             menujoin {
+                 "set"           "Set Or Create"
+                 "setexisting"   "Set if Exists"
+@@ -323,7 +323,7 @@
+             default { "1" }
+             help    "When set to true, the size of the light can be changed without altering the amount of total energy cast into the scene. This is achieved via scaling the light's radiance by the reciprocal of its surface area. When set to false, the radiance is used as-is, regardless of surface area."
+             disablewhen "{ xn__moonraynormalized_control_thb == block } { xn__moonraynormalized_control_thb == none }"
+-            hidewhen "{ primtype != UsdLuxCylinderLight primtype != UsdLuxDiskLight primtype != UsdLuxDistantLight primtype != UsdLuxGeometryLight primtype != UsdLuxRectLight primtype != UsdLuxSphereLight primtype != UsdLuxDiskLight createprims == on }"
++            hidewhen "{ primtype != UsdLuxDistantLight createprims == on }"
+             parmtag { "usdvaluetype" "bool" }
+         }
+         parm {
+--- HdMoonrayRendererPlugin_Light.ds.orig	2026-07-07 14:17:12
++++ HdMoonrayRendererPlugin_Light.ds	2026-07-07 14:26:59
+@@ -7,7 +7,7 @@
+         label   "moonray:class"
+         type    string
+         invisible
+-        default { "set" }
++        default { "none" }
+         menujoin {
+             "set"           "![BUTTONS_set_or_create]Set or Create"
+             "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+@@ -445,8 +445,8 @@
+             name    "xn__moonraynormalized_control_thb"
+             label   "moonray:normalized"
+             type    string
+-            default { "none" }
+-            hidewhen "{ primtype != UsdLuxCylinderLight primtype != UsdLuxDiskLight primtype != UsdLuxDistantLight primtype != UsdLuxGeometryLight primtype != UsdLuxPortalLight primtype != UsdLuxRectLight primtype != UsdLuxSphereLight primtype != UsdLuxDiskLight createprims == on }"
++            default { "set" }
++            hidewhen "{ primtype != UsdLuxDistantLight createprims == on }"
+             menujoin {
+                 "set"           "![BUTTONS_set_or_create]Set or Create"
+                 "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+@@ -462,7 +462,7 @@
+             default { "1" }
+             help    "When set to true, the size of the light can be changed without altering the amount of total energy cast into the scene. This is achieved via scaling the light's radiance by the reciprocal of its surface area. When set to false, the radiance is used as-is, regardless of surface area."
+             disablewhen "{ xn__moonraynormalized_control_thb == block } { xn__moonraynormalized_control_thb == none }"
+-            hidewhen "{ primtype != UsdLuxCylinderLight primtype != UsdLuxDiskLight primtype != UsdLuxDistantLight primtype != UsdLuxGeometryLight primtype != UsdLuxPortalLight primtype != UsdLuxRectLight primtype != UsdLuxSphereLight primtype != UsdLuxDiskLight createprims == on }"
++            hidewhen "{ primtype != UsdLuxDistantLight createprims == on }"
+             parmtag { "usdvaluetype" "bool" }
+         }
+         parm {
+--- moonray_DistantLight.ds.orig	2026-07-07 14:17:12
++++ moonray_DistantLight.ds	2026-07-07 14:17:50
+@@ -311,7 +311,7 @@
+             name    "xn__inputsnormalize_control_jeb"
+             label   "inputs:normalize"
+             type    string
+-            default { "none" }
++            default { "set" }
+             menujoin {
+                 "set"           "![BUTTONS_set_or_create]Set or Create"
+                 "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"

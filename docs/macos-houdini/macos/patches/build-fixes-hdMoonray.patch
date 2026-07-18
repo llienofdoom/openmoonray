@@ -1,0 +1,253 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 2f61a2a..28a55f7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -31,6 +31,17 @@ if(NOT pxr_FOUND)
+     find_package(pxr REQUIRED)
+ endif()
+ 
++# For Houdini builds: CMAKE_CXX_FLAGS puts toolkit/include (USD 24.3) in
++# OTHER_CPLUSPLUSFLAGS but the Xcode generator places SYSTEM_HEADER_SEARCH_PATHS
++# BEFORE OTHER_CPLUSPLUSFLAGS in the compile command. installs/include (which has
++# conflicting USD 22.11 pxr headers) sits in SYSTEM_HEADER_SEARCH_PATHS and wins.
++# The fix: temporarily disable installs/include/pxr/ before building so clang
++# falls through to toolkit/include (in OTHER_CPLUSPLUSFLAGS). Use build-houdini.sh
++# in the docs/ directory to automate the disable/build/restore cycle.
++if (MOONRAY_USE_HOUDINI AND NOT "$ENV{PXR_INCLUDE_PREFIX}" STREQUAL "")
++    message(STATUS "HdMoonray Houdini build: use build-houdini.sh to build (disables standalone pxr headers during compile to force USD 24.3)")
++endif()
++
+ # This is needed for linking against the USD 0.25.5 libraries
+ # as they depend on OpenGL but don't specify it in
+ # their cmake config.
+diff --git a/cmd/hd_cmd/hd_usd2rdl/CMakeLists.txt b/cmd/hd_cmd/hd_usd2rdl/CMakeLists.txt
+index 83d5456..1f73e09 100644
+--- a/cmd/hd_cmd/hd_usd2rdl/CMakeLists.txt
++++ b/cmd/hd_cmd/hd_usd2rdl/CMakeLists.txt
+@@ -5,6 +5,7 @@ set(target hd_usd2rdl)
+ 
+ add_executable(${target})
+ 
++
+ target_sources(${target}
+     PRIVATE
+         FreeCamera.cc
+diff --git a/lib/hydramoonray/ValueConverter.cc b/lib/hydramoonray/ValueConverter.cc
+index 135069f..90888e9 100644
+--- a/lib/hydramoonray/ValueConverter.cc
++++ b/lib/hydramoonray/ValueConverter.cc
+@@ -5,6 +5,9 @@
+ 
+ #include <scene_rdl2/render/logging/logging.h>
+ 
++#include <cstdint>
++#include <limits>
++
+ #include <pxr/usd/sdf/assetPath.h>
+ 
+ namespace hdMoonray {
+@@ -17,6 +20,39 @@ static void _clearBinding(SceneObject* sceneObj, const Attribute* attribute)
+         sceneObj->setBinding(*attribute,nullptr);
+ }
+ 
++static bool _extractIntegral64(const pxr::VtValue& val, std::int64_t* out)
++{
++    if (val.IsHolding<int>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<int>());
++        return true;
++    }
++    if (val.IsHolding<long>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<long>());
++        return true;
++    }
++    if (val.IsHolding<long long>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<long long>());
++        return true;
++    }
++    return false;
++}
++
++static bool _narrowIntChecked(SceneObject* sceneObj,
++                              const Attribute* attribute,
++                              std::int64_t value,
++                              Int* out)
++{
++    constexpr std::int64_t kMin = static_cast<std::int64_t>(std::numeric_limits<Int>::min());
++    constexpr std::int64_t kMax = static_cast<std::int64_t>(std::numeric_limits<Int>::max());
++    if (value < kMin || value > kMax) {
++        Logger::error(sceneObj->getName(), '.', attribute->getName(),
++                      ": integer value ", value, " out of Int range [", kMin, ", ", kMax, "]");
++        return false;
++    }
++    *out = static_cast<Int>(value);
++    return true;
++}
++
+ template<typename T>
+ static void _set(SceneObject* sceneObj, const Attribute* attribute, const T& value) {
+     sceneObj->set(AttributeKey<T>(*attribute), value);
+@@ -130,8 +166,9 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+ {
+     switch(attribute->getType()) {
+     case TYPE_BOOL:
+-        if (val.IsHolding<long>()) {
+-            sceneObj->set(AttributeKey<Bool>(*attribute), static_cast<bool>(val.UncheckedGet<long>()));
++        if (val.IsHolding<long>() || val.IsHolding<long long>()) {
++            const long long v = val.IsHolding<long>() ? static_cast<long long>(val.UncheckedGet<long>()) : val.UncheckedGet<long long>();
++            sceneObj->set(AttributeKey<Bool>(*attribute), static_cast<bool>(v));
+             return;
+         }
+         if (_setAttributeRef<Bool, bool>(sceneObj, attribute, val)) return;
+@@ -144,10 +181,15 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+                 key = &(val.UncheckedGet<pxr::TfToken>().GetString());
+             } else if (val.IsHolding<std::string>()) {
+                 key = &(val.UncheckedGet<std::string>());
+-            } else if (val.IsHolding<long>() || val.IsHolding<int>()) {
+-                const int intVal = val.IsHolding<long>() ?
+-                                   static_cast<int>(val.UncheckedGet<long>()) :
+-                                   val.UncheckedGet<int>();
++            } else {
++                std::int64_t int64Val = 0;
++                if (!_extractIntegral64(val, &int64Val)) {
++                    break; // go print normal error message
++                }
++                Int intVal = 0;
++                if (!_narrowIntChecked(sceneObj, attribute, int64Val, &intVal)) {
++                    return;
++                }
+                 int index = 0;
+                 for (auto it = attribute->beginEnumValues(); it != attribute->endEnumValues(); ++it) {
+                     if (index == intVal) {
+@@ -157,8 +199,6 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+                     ++index;
+                 }
+                 break;
+-            } else {
+-                break; // go print normal error message
+             }
+             for (auto it = attribute->beginEnumValues(); it != attribute->endEnumValues(); ++it) {
+                 if (it->second == *key) {
+@@ -170,24 +210,36 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+             Logger::error(sceneObj->getName(), '.', attribute->getName(),
+                           ": Invalid enum key '", *key, "'");
+             return;
+-        } else  if (val.IsHolding<long>()) {
+-            sceneObj->set(AttributeKey<Int>(*attribute), static_cast<int>(val.UncheckedGet<long>()));
+-            return;
+         } else {
++            std::int64_t int64Val = 0;
++            if (_extractIntegral64(val, &int64Val)) {
++                Int intVal = 0;
++                if (!_narrowIntChecked(sceneObj, attribute, int64Val, &intVal)) {
++                    return;
++                }
++                sceneObj->set(AttributeKey<Int>(*attribute), intVal);
++                return;
++            }
+             if (_setAttributeRef<Int, int>(sceneObj, attribute, val)) return;
+         }
+         break;
+     case TYPE_LONG:
+         if (_setAttributeRef<Long, long>(sceneObj, attribute, val)) return;
++        if (val.IsHolding<long long>()) {
++            const long lv = static_cast<long>(val.UncheckedGet<long long>());
++            _set(sceneObj, attribute, reinterpret_cast<const Long&>(lv));
++            _clearBinding(sceneObj, attribute);
++            return;
++        }
+         break;
+     case TYPE_FLOAT:
+         if (val.IsHolding<int>()) {
+             const float floatVal = static_cast<float>(val.UncheckedGet<int>());
+             sceneObj->set(AttributeKey<Float>(*attribute), floatVal);
+             return;
+-        } else if (val.IsHolding<long>()) {
+-            const float floatVal = static_cast<float>(val.UncheckedGet<long>());
+-            sceneObj->set(AttributeKey<Float>(*attribute), floatVal);
++        } else if (val.IsHolding<long>() || val.IsHolding<long long>()) {
++            const long long v = val.IsHolding<long>() ? static_cast<long long>(val.UncheckedGet<long>()) : val.UncheckedGet<long long>();
++            sceneObj->set(AttributeKey<Float>(*attribute), static_cast<float>(v));
+             return;
+         } else {
+             if (_setAttributeRef<Float, float>(sceneObj, attribute, val)) return;
+@@ -250,6 +302,11 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+         break;
+     case TYPE_INT_VECTOR:
+         if (_setAttribute<IntVector, pxr::VtArray<int>>(sceneObj, attribute, val)) return;
++        if (val.IsHolding<pxr::TfToken>()) {
++            // Houdini exports ramp interpolation as a single TfToken (e.g. "hermite").
++            // MoonRay expects IntVector; silently skip and let RDL2 keep its default.
++            return;
++        }
+         break;
+     case TYPE_LONG_VECTOR:
+         if (_setAttribute<LongVector, pxr::VtArray<long>>(sceneObj, attribute, val)) return;
+diff --git a/lib/hydramoonray/Volume.cc b/lib/hydramoonray/Volume.cc
+index 97c6df1..3fa4453 100644
+--- a/lib/hydramoonray/Volume.cc
++++ b/lib/hydramoonray/Volume.cc
+@@ -4,7 +4,7 @@
+ #include "Volume.h"
+ #include "RenderDelegate.h"
+ #include "HdmLog.h"
+-#include "pxr/usd/sdf/types.h" // for SdfAssetPath
++#include "pxr/usd/sdf/assetPath.h" // SdfAssetPath (sdf/types.h triggers SdfChildrenProxy::_Set instantiation in USD 24.x)
+ #include <scene_rdl2/scene/rdl2/Geometry.h>
+ #include <iostream>
+ 
+diff --git a/plugin/CMakeLists.txt b/plugin/CMakeLists.txt
+index d4e8f48..06f3bba 100644
+--- a/plugin/CMakeLists.txt
++++ b/plugin/CMakeLists.txt
+@@ -7,4 +7,10 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/plugInfo.json
+ add_subdirectory(hd_moonray)
+ add_subdirectory(hd_moonray_debug)
+ add_subdirectory(houdini)
+-add_subdirectory(adapters)
++# hdMoonrayAdapters sources include usdImaging/light*Adapter.h which triggers a
++# SdfChildrenProxy::_Set instantiation error in Houdini 20.5's USD 24.3 headers.
++# Skip the adapters entirely for Houdini builds (they are standalone USD plugins
++# with no link-time dependents, so omitting them does not break hd_moonray).
++if (NOT MOONRAY_USE_HOUDINI)
++    add_subdirectory(adapters)
++endif()
+diff --git a/plugin/adapters/CMakeLists.txt b/plugin/adapters/CMakeLists.txt
+index 5765232..a3703c4 100644
+--- a/plugin/adapters/CMakeLists.txt
++++ b/plugin/adapters/CMakeLists.txt
+@@ -20,10 +20,17 @@ endif()
+ target_sources(${component}
+     PRIVATE
+         MoonrayMeshLightAdapter.cc
+-        MoonrayLightFilterAdapter.cc
+         ${DwaSpecificSources}
+ )
+ 
++# MoonrayLightFilterAdapter.cc includes usdImaging/lightFilterAdapter.h which triggers
++# instantiation of SdfChildrenProxy<_View>::_ValueProxy::operator= — a method that calls
++# _Set() on SdfChildrenProxy, which doesn't exist in Houdini 20.5's USD 24.3 headers.
++# Exclude it from Houdini builds; light filter adapters are not needed for basic integration.
++if (NOT MOONRAY_USE_HOUDINI)
++    target_sources(${component} PRIVATE MoonrayLightFilterAdapter.cc)
++endif()
++
+ target_include_directories(${component}
+     PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+diff --git a/plugin/hd_moonray/CMakeLists.txt b/plugin/hd_moonray/CMakeLists.txt
+index 1aa3088..410ed89 100644
+--- a/plugin/hd_moonray/CMakeLists.txt
++++ b/plugin/hd_moonray/CMakeLists.txt
+@@ -25,6 +25,7 @@ target_include_directories(${component}
+         $<INSTALL_INTERFACE:include>
+ )
+ 
++
+ if (NOT IsDarwinPlatform)
+     set(PlatformSpecificLibs atomic)
+ endif()
+@@ -88,3 +89,4 @@ INSTALL(FILES ${plugInfoFile}
+     DESTINATION plugin/pxr/${component}
+ )
+ 
++

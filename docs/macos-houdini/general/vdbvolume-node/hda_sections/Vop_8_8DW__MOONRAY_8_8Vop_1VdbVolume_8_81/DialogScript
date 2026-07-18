@@ -1,0 +1,159 @@
+# Dialog script for Vop::DW_MOONRAY::VdbVolume::1 automatically generated
+
+{
+    name	Vop::DW_MOONRAY::VdbVolume::1
+    script	VdbVolume
+    label	"Moonray VdbVolume"
+
+    rendermask	moonray
+    externalshader 1
+    shadertype	generic
+	input	string	label	Label
+	input	int	bake_resolution_mode	"Bake Resolution Mode"
+	input	int	bake_divisions	"Bake Divisions"
+	input	float	bake_voxel_size	"Bake Voxel Size"
+	input	float	surface_opacity_threshold	"Surface Opacity Threshold"
+	input	vector	opacity_gain_mult	"Opacity Gain Mult"
+	input	vector	color_mult	"Color Mult"
+	input	vector	incandescence_gain_mult	"Incandescence Gain Mult"
+	input	float	anisotropy	Anisotropy
+    output	volume	volume	Volume
+	inputflags	label	1
+	inputflags	bake_resolution_mode	1
+	inputflags	bake_divisions	1
+	inputflags	bake_voxel_size	1
+	inputflags	surface_opacity_threshold	1
+	inputflags	opacity_gain_mult	0
+	inputflags	color_mult	0
+	inputflags	incandescence_gain_mult	0
+	inputflags	anisotropy	0
+	signature	"Default Inputs"	default	{ string int int float float vector vector vector float bsdf vector int matrix3 }
+
+    outputoverrides	default
+    {
+	___begin	auto
+			(0)
+	___begin	auto
+			(0,0,0)
+	___begin	auto
+			(0)
+	___begin	auto
+			(1,0,0,0,1,0,0,0,1)
+    }
+
+    help {
+	""
+    }
+
+    parm {
+        name    "label"
+        label   "Label"
+        type    string
+        default { "" }
+        help    "label used in light aovs"
+        parmtag { "moonray::is_parm" "1" }
+    }
+    group {
+        name    "folder"
+        label   "Volume Baking"
+
+        parm {
+            name    "bake_resolution_mode"
+            label   "Bake Resolution Mode"
+            type    string
+            default { "default" }
+            help    "Method to specify grid resolution of baked density grid.  Choices are:\n		\"default\": For shaders that are bound to vdb volumes, use vdb resolution.\n						For shaders that are bounds to mesh geometries use 100 divisions\n		\"divisions\": Specify number of divisions.\n		\"voxel size\": Specify voxel size."
+            menu {
+                "default"       "Default"
+                "divisions"     "Divisions"
+                "voxel size"    "Voxel Size"
+            }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "bake_divisions"
+            label   "Bake Divisions"
+            type    integer
+            default { "100" }
+            help    "Divide widest axis by this many divisions"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "bake_voxel_size"
+            label   "Bake Voxel Size"
+            type    float
+            default { "10" }
+            help    "Size of voxel in world space"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+    }
+
+    group {
+        name    "folder_1"
+        label   "Volume"
+
+        parm {
+            name    "surface_opacity_threshold"
+            label   "Surface Opacity Threshold"
+            type    float
+            default { "0.5" }
+            help    "Accumulated opacity that's considered the 'surface' for computing surface position and Z"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "opacity_gain_mult"
+            label   "Opacity Gain Mult"
+            type    color
+            size    3
+            default { "1" "1" "1" }
+            help    "A multiplier applied to the volume density"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "color_mult"
+            label   "Color Mult"
+            type    color
+            size    3
+            default { "1" "1" "1" }
+            help    "The albedo of the volume"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "incandescence_gain_mult"
+            label   "Incandescence Gain Mult"
+            type    color
+            size    3
+            default { "1" "1" "1" }
+            help    "A multiplier applied to the volume emission"
+            range   { 0 10 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+        parm {
+            name    "anisotropy"
+            label   "Anisotropy"
+            type    float
+            default { "0" }
+            help    "Value in the interval [-1,1] that defines how foward (1) or backward (-1) scattering the volume is.  A value of 0.0 indicates an isotropic volume."
+            range   { -1 1 }
+            parmtag { "moonray::is_parm" "1" }
+        }
+    }
+
+    parm {
+        name    "volume"
+        label   "volume"
+        type    integer
+        invisible
+        nolabel
+        default { "0" }
+        range   { 0 10 }
+        parmtag { "sidefx::shader_isparm" "0" }
+        parmtag { "sidefx::shader_parmname" "out" }
+        parmtag { "sidefx::shader_parmtype" "token" }
+    }
+}

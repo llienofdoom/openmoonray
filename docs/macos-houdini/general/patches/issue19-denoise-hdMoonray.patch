@@ -1,0 +1,155 @@
+diff --git a/plugin/hd_moonray/ArrasRenderer.cc b/plugin/hd_moonray/ArrasRenderer.cc
+index e93a542..9e200b6 100644
+--- a/plugin/hd_moonray/ArrasRenderer.cc
++++ b/plugin/hd_moonray/ArrasRenderer.cc
+@@ -143,6 +143,14 @@ ArrasRenderer::connect(bool resetFailureCount)
+         });
+     mCurrentDenoiseMode = mSettings.getDenoiseMode();
+     mFbReceiver->setBeautyDenoiseMode(mCurrentDenoiseMode);
++    // A freshly-created ClientReceiverFb defaults its denoise engine to OPTIX.
++    // The mode is pushed above, but the engine must be pushed too, otherwise the
++    // receiver builds an OptiX denoiser (unavailable on macOS -> "Optix mode not
++    // supported in this build"). The applySettings() "if changed" guard cannot do
++    // this because mCurrentDenoiseEngine was already latched while mFbReceiver was
++    // null, so set it explicitly here on the new receiver.
++    mCurrentDenoiseEngine = mSettings.getDenoiseEngine();
++    mFbReceiver->setDenoiseEngine(mCurrentDenoiseEngine);
+ 
+     mProgress = -1;
+     mFirstMessageSent = false;
+diff --git a/plugin/hd_moonray/ArrasSettings.cc b/plugin/hd_moonray/ArrasSettings.cc
+index 406241e..6015e0f 100644
+--- a/plugin/hd_moonray/ArrasSettings.cc
++++ b/plugin/hd_moonray/ArrasSettings.cc
+@@ -29,6 +29,13 @@ TF_DEFINE_PRIVATE_TOKENS(Tokens,
+    (enableOIDN)
+    (denoiseAlbedoGuiding)
+    (denoiseNormalGuiding)
++   // Namespaced variants authored on a USD RenderSettings prim (per-output control).
++   // The bare tokens above come from the viewport delegate settings; husk/Solaris
++   // forwards RenderSettings-prim attributes under their full namespaced name.
++   ((moonrayEnableDenoise, "moonray:enableDenoise"))
++   ((moonrayEnableOIDN, "moonray:enableOIDN"))
++   ((moonrayDenoiseAlbedoGuiding, "moonray:denoiseAlbedoGuiding"))
++   ((moonrayDenoiseNormalGuiding, "moonray:denoiseNormalGuiding"))
+ );
+ 
+ using scene_rdl2::logging::Logger;
+@@ -292,11 +299,19 @@ void
+ ArrasSettings::setDenoiseEngine(bool enable, bool oidn)
+ {
+     if (enable){
++#if defined(__APPLE__)
++        // OptiX requires CUDA/NVIDIA and is compiled out on macOS (no
++        // MOONRAY_USE_OPTIX). Requesting it aborts denoising with
++        // "Optix mode not supported in this build", so always use OIDN here
++        // regardless of the OIDN toggle.
++        mDenoiseEngine = mcrt_dataio::ClientReceiverFb::DenoiseEngine::OPEN_IMAGE_DENOISE;
++#else
+         if (oidn) {
+             mDenoiseEngine = mcrt_dataio::ClientReceiverFb::DenoiseEngine::OPEN_IMAGE_DENOISE;
+         } else {
+             mDenoiseEngine = mcrt_dataio::ClientReceiverFb::DenoiseEngine::OPTIX;
+         }
++#endif
+     }
+ }
+ 
+@@ -310,10 +325,32 @@ ArrasSettings::applySettings(const RenderSettings& settings)
+     setMaxFps(settings.get<float>(Tokens->maxFps));
+     setExecMode(settings.getExecutionMode());
+     setMaxConnectRetries(settings.get<int>(Tokens->maxConnectRetries));
+-    setDenoiseMode(settings.get<bool>(Tokens->enableDenoise),
+-                   settings.get<bool>(Tokens->enableOIDN),
+-                   settings.get<bool>(Tokens->denoiseAlbedoGuiding),
+-                   settings.get<bool>(Tokens->denoiseNormalGuiding));
++    // Denoise settings can come from two places: the viewport delegate settings
++    // (bare tokens, always registered as descriptors) and a USD RenderSettings prim
++    // (namespaced "moonray:*" tokens, only present when authored by husk/Solaris).
++    // A missing key returns an empty VtValue, so the namespaced side must be
++    // presence-checked before get<bool>() (which would otherwise error). Either
++    // source enabling a setting turns it on.
++    auto denoiseFlag = [&settings](const TfToken& bare, const TfToken& ns) -> bool {
++        // A RenderSettings prim authors the namespaced key (only when its control
++        // parm is set), and that per-output value overrides the viewport/global
++        // (bare) value. When the prim doesn't author it, fall back to the bare value.
++        VtValue v = settings.getRenderSetting(ns);
++        if (!v.IsEmpty()) {
++            VtValue b = v.Cast<bool>();
++            if (!b.IsEmpty()) return b.Get<bool>();
++        }
++        return settings.get<bool>(bare);
++    };
++    const bool enableDenoise = denoiseFlag(Tokens->enableDenoise, Tokens->moonrayEnableDenoise);
++    const bool enableOIDN    = denoiseFlag(Tokens->enableOIDN, Tokens->moonrayEnableOIDN);
++    const bool albedoGuiding = denoiseFlag(Tokens->denoiseAlbedoGuiding, Tokens->moonrayDenoiseAlbedoGuiding);
++    const bool normalGuiding = denoiseFlag(Tokens->denoiseNormalGuiding, Tokens->moonrayDenoiseNormalGuiding);
++    setDenoiseMode(enableDenoise, enableOIDN, albedoGuiding, normalGuiding);
++    // Wire the "Use OIDN Denoising" toggle to the actual engine selection.
++    // Without this call mDenoiseEngine stays at its OPTIX default and the
++    // OIDN toggle has no effect.
++    setDenoiseEngine(enableDenoise, enableOIDN);
+ }
+ 
+ }
+diff --git a/plugin/houdini/soho/parameters/HdMoonrayRendererPlugin_Viewport.ds b/plugin/houdini/soho/parameters/HdMoonrayRendererPlugin_Viewport.ds
+index 7ff1039..9b66ec7 100644
+--- a/plugin/houdini/soho/parameters/HdMoonrayRendererPlugin_Viewport.ds
++++ b/plugin/houdini/soho/parameters/HdMoonrayRendererPlugin_Viewport.ds
+@@ -392,9 +392,11 @@
+         label       "Denoising"
+         type        toggle
+         size        1
+-        default     { 0 }
+-        help        "Enable denoising of render. By default Optix engine is used unless OIDN is enabled."
++        default     { 1 }
++        help        "Enable denoising of render. By default Optix engine is used unless OIDN is enabled (on macOS OIDN is always used)."
++        parmtag     { "spare_category" "Denoise" }
+         parmtag     { "uiscope" "viewport" }
++        parmtag     { "usdvaluetype" "bool" }
+     }
+ 
+     parm {
+@@ -402,10 +404,12 @@
+         label       "Use OIDN Denoising"
+         type        toggle
+         size        1
+-        default     { 0 }
++        default     { 1 }
+         disablewhen "{ enableDenoise == 0 }"
+-        help        "Use OIDN algorithm instead of Optix when denoising is enabled."
++        help        "Use OIDN algorithm instead of Optix when denoising is enabled. Ignored on macOS, where OIDN is always used."
++        parmtag     { "spare_category" "Denoise" }
+         parmtag     { "uiscope" "viewport" }
++        parmtag     { "usdvaluetype" "bool" }
+     }
+ 
+     parm {
+@@ -413,10 +417,12 @@
+         label       "Denoise : Albedo guiding"
+         type        toggle
+         size        1
+-        default     { 0 }
++        default     { 1 }
+         disablewhen "{ enableDenoise == 0 } { enableOIDN == 0 }"
+         help        "Use albedo guiding when denoising"
++        parmtag     { "spare_category" "Denoise" }
+         parmtag     { "uiscope" "viewport" }
++        parmtag     { "usdvaluetype" "bool" }
+     }
+ 
+     parm {
+@@ -424,10 +430,12 @@
+         label       "Denoise : Normal guiding"
+         type        toggle
+         size        1
+-        default     { 0 }
++        default     { 1 }
+         disablewhen "{ enableDenoise == 0 } { enableOIDN == 0 }"
+         help        "Use normal guiding when denoising"
++        parmtag     { "spare_category" "Denoise" }
+         parmtag     { "uiscope" "viewport" }
++        parmtag     { "usdvaluetype" "bool" }
+     }
+ 
+ 

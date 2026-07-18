@@ -1,0 +1,45 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    upAxis = "Y"
+    metersPerUnit = 1
+)
+
+def Xform "World"
+{
+    def Volume "Volume" (prepend apiSchemas = ["MaterialBindingAPI"])
+    {
+        rel field:density = </World/Volume/Field>
+        rel material:binding = </World/Material>
+        float3[] extent = [(-0.6, -0.6, -0.5), (0.6, 0.6, 0.5)]
+        def OpenVDBAsset "Field"
+        {
+            token fieldName = "density"
+            asset filePath = @/Applications/MoonRay/source/openmoonray/rats/assets/models/bunny.vdb@
+        }
+    }
+
+    def Material "Material"
+    {
+        token outputs:moonray:volume.connect = </World/Material/shader.outputs:volume>
+        def Shader "shader"
+        {
+            uniform token info:id = "VdbVolume"
+            color3f inputs:color_mult = (1, 0.8, 0.8)
+            token outputs:volume
+        }
+    }
+
+    def DomeLight "Light"
+    {
+        float inputs:intensity = 1
+    }
+
+    def Camera "camera"
+    {
+        float focalLength = 50
+        float horizontalAperture = 20.955
+        double3 xformOp:translate = (0, 0, 6)
+        token[] xformOpOrder = ["xformOp:translate"]
+    }
+}

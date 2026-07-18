@@ -1,0 +1,335 @@
+diff --git a/lib/hydramoonray/Camera.cc b/lib/hydramoonray/Camera.cc
+index ef13fdd..0eb6838 100644
+--- a/lib/hydramoonray/Camera.cc
++++ b/lib/hydramoonray/Camera.cc
+@@ -286,7 +286,7 @@ Camera::updateCamera(pxr::HdSceneDelegate* sceneDelegate, RenderDelegate& render
+ 
+             pxr::VtValue val = sceneDelegate->GetCameraParamValue(id, pxr::TfToken("moonray:"+attrName));
+             if (not val.IsEmpty()) {
+-                ValueConverter::setAttribute(mCamera, *it, val);
++                ValueConverter::setAttribute(mCamera, *it, val, &renderDelegate);
+             }
+             // Fixme: if value is not set it should be reset to default
+         }
+diff --git a/lib/hydramoonray/Light.cc b/lib/hydramoonray/Light.cc
+index 65409e4..0229066 100644
+--- a/lib/hydramoonray/Light.cc
++++ b/lib/hydramoonray/Light.cc
+@@ -234,7 +234,7 @@ Light::syncParams(const pxr::SdfPath& id,
+         std::string moonrayName = "moonray:"+attrName;
+         pxr::VtValue val = sceneDelegate->GetLightParamValue(id, pxr::TfToken(moonrayName));
+         if (!val.IsEmpty()) {
+-            ValueConverter::setAttribute(mLight, *it, val);
++            ValueConverter::setAttribute(mLight, *it, val, &renderDelegate);
+             continue;
+         }
+ 
+@@ -322,7 +322,7 @@ Light::syncParams(const pxr::SdfPath& id,
+                 // schema will cause correct default to be returned
+                 val = sceneDelegate->GetLightParamValue(id, luxName);
+                 if (!val.IsEmpty()) {
+-                    ValueConverter::setAttribute(mLight, *it, val);
++                    ValueConverter::setAttribute(mLight, *it, val, &renderDelegate);
+                     continue;
+                 }
+             }
+diff --git a/lib/hydramoonray/LightFilter.cc b/lib/hydramoonray/LightFilter.cc
+index 7170d37..1c89ee3 100644
+--- a/lib/hydramoonray/LightFilter.cc
++++ b/lib/hydramoonray/LightFilter.cc
+@@ -71,7 +71,7 @@ LightFilter::syncParams(const pxr::SdfPath& id,
+             if (val.IsEmpty()) {
+                 ValueConverter::setDefault(mLightFilter, *it);
+             } else {
+-                ValueConverter::setAttribute(mLightFilter, *it, val);
++                ValueConverter::setAttribute(mLightFilter, *it, val, &renderDelegate);
+             }
+         }
+     }
+diff --git a/lib/hydramoonray/Material.cc b/lib/hydramoonray/Material.cc
+index 5bc3882..18cb6d8 100644
+--- a/lib/hydramoonray/Material.cc
++++ b/lib/hydramoonray/Material.cc
+@@ -157,7 +157,7 @@ makeMoonrayShader(
+                 } else {
+                     auto valIt = node.parameters.find(pxr::TfToken(attrName));
+                     if (valIt != node.parameters.end()) {
+-                        hdMoonray::ValueConverter::setAttribute(shaderObj, attribute, valIt->second);
++                        hdMoonray::ValueConverter::setAttribute(shaderObj, attribute, valIt->second, &renderDelegate);
+                     } else {
+                         hdMoonray::ValueConverter::setDefault(shaderObj, attribute);
+                     }
+diff --git a/lib/hydramoonray/ValueConverter.cc b/lib/hydramoonray/ValueConverter.cc
+index 135069f..6ecd74d 100644
+--- a/lib/hydramoonray/ValueConverter.cc
++++ b/lib/hydramoonray/ValueConverter.cc
+@@ -2,10 +2,15 @@
+ // SPDX-License-Identifier: Apache-2.0
+ 
+ #include "ValueConverter.h"
++#include "RenderDelegate.h"
+ 
+ #include <scene_rdl2/render/logging/logging.h>
+ 
++#include <cstdint>
++#include <limits>
++
+ #include <pxr/usd/sdf/assetPath.h>
++#include <pxr/usd/sdf/path.h>
+ 
+ namespace hdMoonray {
+ 
+@@ -17,6 +22,39 @@ static void _clearBinding(SceneObject* sceneObj, const Attribute* attribute)
+         sceneObj->setBinding(*attribute,nullptr);
+ }
+ 
++static bool _extractIntegral64(const pxr::VtValue& val, std::int64_t* out)
++{
++    if (val.IsHolding<int>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<int>());
++        return true;
++    }
++    if (val.IsHolding<long>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<long>());
++        return true;
++    }
++    if (val.IsHolding<long long>()) {
++        *out = static_cast<std::int64_t>(val.UncheckedGet<long long>());
++        return true;
++    }
++    return false;
++}
++
++static bool _narrowIntChecked(SceneObject* sceneObj,
++                              const Attribute* attribute,
++                              std::int64_t value,
++                              Int* out)
++{
++    constexpr std::int64_t kMin = static_cast<std::int64_t>(std::numeric_limits<Int>::min());
++    constexpr std::int64_t kMax = static_cast<std::int64_t>(std::numeric_limits<Int>::max());
++    if (value < kMin || value > kMax) {
++        Logger::error(sceneObj->getName(), '.', attribute->getName(),
++                      ": integer value ", value, " out of Int range [", kMin, ", ", kMax, "]");
++        return false;
++    }
++    *out = static_cast<Int>(value);
++    return true;
++}
++
+ template<typename T>
+ static void _set(SceneObject* sceneObj, const Attribute* attribute, const T& value) {
+     sceneObj->set(AttributeKey<T>(*attribute), value);
+@@ -125,13 +163,43 @@ static bool _setAttribute(SceneObject* sceneObj, const Attribute* attribute, con
+     }
+ }
+ 
++// Resolve a single prim-path string to an rdl2 SceneObject via the render
++// delegate. Empty path -> nullptr (clears the reference). Unresolved path ->
++// nullptr + a warning (the referenced prim may not exist or not be synced yet).
++static SceneObject*
++_resolveSceneObjectRef(RenderDelegate* renderDelegate, const std::string& path,
++                       const SceneObject* sceneObj, const Attribute* attribute)
++{
++    if (path.empty()) return nullptr;
++    SceneObject* obj = renderDelegate->getSceneObject(path);
++    if (!obj) {
++        Logger::warn(sceneObj->getName(), '.', attribute->getName(),
++                     ": could not resolve SceneObject reference '", path,
++                     "' (referenced prim does not exist or is not synced yet)");
++    }
++    return obj;
++}
++
++// Extract a single prim path from a VtValue holding a string, SdfPath or token.
++// Returns false if the value holds none of those types.
++static bool
++_extractPath(const pxr::VtValue& val, std::string* out)
++{
++    if (val.IsHolding<std::string>())        { *out = val.UncheckedGet<std::string>(); return true; }
++    if (val.IsHolding<pxr::SdfPath>())       { *out = val.UncheckedGet<pxr::SdfPath>().GetString(); return true; }
++    if (val.IsHolding<pxr::TfToken>())       { *out = val.UncheckedGet<pxr::TfToken>().GetString(); return true; }
++    return false;
++}
++
+ void
+-ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute, const pxr::VtValue& val)
++ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute, const pxr::VtValue& val,
++                             RenderDelegate* renderDelegate)
+ {
+     switch(attribute->getType()) {
+     case TYPE_BOOL:
+-        if (val.IsHolding<long>()) {
+-            sceneObj->set(AttributeKey<Bool>(*attribute), static_cast<bool>(val.UncheckedGet<long>()));
++        if (val.IsHolding<long>() || val.IsHolding<long long>()) {
++            const long long v = val.IsHolding<long>() ? static_cast<long long>(val.UncheckedGet<long>()) : val.UncheckedGet<long long>();
++            sceneObj->set(AttributeKey<Bool>(*attribute), static_cast<bool>(v));
+             return;
+         }
+         if (_setAttributeRef<Bool, bool>(sceneObj, attribute, val)) return;
+@@ -144,10 +212,15 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+                 key = &(val.UncheckedGet<pxr::TfToken>().GetString());
+             } else if (val.IsHolding<std::string>()) {
+                 key = &(val.UncheckedGet<std::string>());
+-            } else if (val.IsHolding<long>() || val.IsHolding<int>()) {
+-                const int intVal = val.IsHolding<long>() ?
+-                                   static_cast<int>(val.UncheckedGet<long>()) :
+-                                   val.UncheckedGet<int>();
++            } else {
++                std::int64_t int64Val = 0;
++                if (!_extractIntegral64(val, &int64Val)) {
++                    break; // go print normal error message
++                }
++                Int intVal = 0;
++                if (!_narrowIntChecked(sceneObj, attribute, int64Val, &intVal)) {
++                    return;
++                }
+                 int index = 0;
+                 for (auto it = attribute->beginEnumValues(); it != attribute->endEnumValues(); ++it) {
+                     if (index == intVal) {
+@@ -157,8 +230,6 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+                     ++index;
+                 }
+                 break;
+-            } else {
+-                break; // go print normal error message
+             }
+             for (auto it = attribute->beginEnumValues(); it != attribute->endEnumValues(); ++it) {
+                 if (it->second == *key) {
+@@ -170,24 +241,36 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+             Logger::error(sceneObj->getName(), '.', attribute->getName(),
+                           ": Invalid enum key '", *key, "'");
+             return;
+-        } else  if (val.IsHolding<long>()) {
+-            sceneObj->set(AttributeKey<Int>(*attribute), static_cast<int>(val.UncheckedGet<long>()));
+-            return;
+         } else {
++            std::int64_t int64Val = 0;
++            if (_extractIntegral64(val, &int64Val)) {
++                Int intVal = 0;
++                if (!_narrowIntChecked(sceneObj, attribute, int64Val, &intVal)) {
++                    return;
++                }
++                sceneObj->set(AttributeKey<Int>(*attribute), intVal);
++                return;
++            }
+             if (_setAttributeRef<Int, int>(sceneObj, attribute, val)) return;
+         }
+         break;
+     case TYPE_LONG:
+         if (_setAttributeRef<Long, long>(sceneObj, attribute, val)) return;
++        if (val.IsHolding<long long>()) {
++            const long lv = static_cast<long>(val.UncheckedGet<long long>());
++            _set(sceneObj, attribute, reinterpret_cast<const Long&>(lv));
++            _clearBinding(sceneObj, attribute);
++            return;
++        }
+         break;
+     case TYPE_FLOAT:
+         if (val.IsHolding<int>()) {
+             const float floatVal = static_cast<float>(val.UncheckedGet<int>());
+             sceneObj->set(AttributeKey<Float>(*attribute), floatVal);
+             return;
+-        } else if (val.IsHolding<long>()) {
+-            const float floatVal = static_cast<float>(val.UncheckedGet<long>());
+-            sceneObj->set(AttributeKey<Float>(*attribute), floatVal);
++        } else if (val.IsHolding<long>() || val.IsHolding<long long>()) {
++            const long long v = val.IsHolding<long>() ? static_cast<long long>(val.UncheckedGet<long>()) : val.UncheckedGet<long long>();
++            sceneObj->set(AttributeKey<Float>(*attribute), static_cast<float>(v));
+             return;
+         } else {
+             if (_setAttributeRef<Float, float>(sceneObj, attribute, val)) return;
+@@ -243,13 +326,28 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+         if (_setAttributeRef<Mat4d, pxr::GfMatrix4d>(sceneObj, attribute, val)) return;
+         break;
+     case TYPE_SCENE_OBJECT:
+-        // not supported yet
++        // Reference to another SceneObject, authored in USD as a prim path
++        // (string / SdfPath / token). Requires the render delegate to resolve.
++        if (renderDelegate) {
++            std::string path;
++            if (_extractPath(val, &path)) {
++                sceneObj->set(AttributeKey<SceneObject*>(*attribute),
++                              _resolveSceneObjectRef(renderDelegate, path, sceneObj, attribute));
++                _clearBinding(sceneObj, attribute);
++                return;
++            }
++        }
+         break;
+     case TYPE_BOOL_VECTOR:
+         if (_setAttribute<BoolVector, pxr::VtArray<bool>>(sceneObj, attribute, val)) return;
+         break;
+     case TYPE_INT_VECTOR:
+         if (_setAttribute<IntVector, pxr::VtArray<int>>(sceneObj, attribute, val)) return;
++        if (val.IsHolding<pxr::TfToken>()) {
++            // Houdini exports ramp interpolation as a single TfToken (e.g. "hermite").
++            // MoonRay expects IntVector; silently skip and let RDL2 keep its default.
++            return;
++        }
+         break;
+     case TYPE_LONG_VECTOR:
+         if (_setAttribute<LongVector, pxr::VtArray<long>>(sceneObj, attribute, val)) return;
+@@ -294,6 +392,36 @@ ValueConverter::setAttribute(SceneObject* sceneObj, const Attribute* attribute,
+         if (_setAttribute<Mat4dVector, pxr::VtArray<pxr::GfMatrix4d>>(sceneObj, attribute, val)) return;
+         break;
+     case TYPE_SCENE_OBJECT_VECTOR:
++        // List of SceneObject references, authored in USD as an array of prim
++        // paths (VtArray<string>, SdfPathVector, VtArray<SdfPath|token>) or a
++        // single path. Requires the render delegate to resolve each entry.
++        if (renderDelegate) {
++            SceneObjectVector objs;
++            auto add = [&](const std::string& p) {
++                SceneObject* o = _resolveSceneObjectRef(renderDelegate, p, sceneObj, attribute);
++                if (o) objs.push_back(o);
++            };
++            bool handled = true;
++            if (val.IsHolding<pxr::VtArray<std::string>>()) {
++                for (const auto& s : val.UncheckedGet<pxr::VtArray<std::string>>()) add(s);
++            } else if (val.IsHolding<pxr::SdfPathVector>()) {
++                for (const auto& p : val.UncheckedGet<pxr::SdfPathVector>()) add(p.GetString());
++            } else if (val.IsHolding<pxr::VtArray<pxr::SdfPath>>()) {
++                for (const auto& p : val.UncheckedGet<pxr::VtArray<pxr::SdfPath>>()) add(p.GetString());
++            } else if (val.IsHolding<pxr::VtArray<pxr::TfToken>>()) {
++                for (const auto& t : val.UncheckedGet<pxr::VtArray<pxr::TfToken>>()) add(t.GetString());
++            } else {
++                std::string path;
++                if (_extractPath(val, &path)) { if (!path.empty()) add(path); }
++                else handled = false;
++            }
++            if (handled) {
++                sceneObj->set(AttributeKey<SceneObjectVector>(*attribute), objs);
++                _clearBinding(sceneObj, attribute);
++                return;
++            }
++        }
++        break;
+     case TYPE_SCENE_OBJECT_INDEXABLE:
+         // not supported yet
+         break;
+diff --git a/lib/hydramoonray/ValueConverter.h b/lib/hydramoonray/ValueConverter.h
+index 73d9d20..7a8082f 100644
+--- a/lib/hydramoonray/ValueConverter.h
++++ b/lib/hydramoonray/ValueConverter.h
+@@ -19,10 +19,20 @@
+ 
+ using namespace scene_rdl2::rdl2;
+ 
+-namespace hdMoonray { namespace ValueConverter {
++namespace hdMoonray {
+ 
+-// copy usd attribute to scene_rdl2 attribute
+-void setAttribute(SceneObject* sceneObj, const Attribute*, const pxr::VtValue& val);
++// forward decl: used to resolve SceneObject/SceneObjectVector references
++// (authored as prim path string(s)) to actual rdl2 SceneObjects by name.
++class RenderDelegate;
++
++namespace ValueConverter {
++
++// copy usd attribute to scene_rdl2 attribute.
++// renderDelegate is required to resolve TYPE_SCENE_OBJECT / TYPE_SCENE_OBJECT_VECTOR
++// attributes (whose USD value is a prim path or array of prim paths); pass nullptr
++// when the caller has no delegate (those attribute types then remain unsupported).
++void setAttribute(SceneObject* sceneObj, const Attribute*, const pxr::VtValue& val,
++                  RenderDelegate* renderDelegate = nullptr);
+ //void setAttribute(SceneObject* sceneObj, const std::string& name, const pxr::VtValue& val);
+ 
+ // reset the attribute to default

@@ -1,0 +1,139 @@
+diff --git a/lib/hydramoonray/Light.cc b/lib/hydramoonray/Light.cc
+index 65409e4..f9c722b 100644
+--- a/lib/hydramoonray/Light.cc
++++ b/lib/hydramoonray/Light.cc
+@@ -30,6 +30,7 @@ pxr::TfToken moonrayClassToken("moonray:class");
+ pxr::TfToken spotLightToken("SpotLight");
+ pxr::TfToken rectLightToken("RectLight");
+ pxr::TfToken geometryLightToken("geometryLight");
++pxr::TfToken meshLightToken("MeshLight");
+ pxr::TfToken geometryToken("inputs:geometry");
+ pxr::TfToken moonrayGeometryToken("moonray:geometry");
+ 
+@@ -84,7 +85,9 @@ Light::rdlClassName(const pxr::SdfPath& id,
+         } else {
+             error = (classToken != luxRdlClass);
+         }
+-        if (error) {
++        // MeshLight (and other RDL2 light classes with no 1:1 UsdLux type) is a legitimate
++        // moonray:class override on a carrier light prim — don't warn for it.
++        if (error && classToken != meshLightToken) {
+             Logger::warn(id, ".moonray:class: '", classToken,
+                          "' may not be compatible with USD light type '", mType, "'");
+         }
+@@ -189,6 +192,24 @@ colorTemperatureToRGB(float kelvin)
+                         scene_rdl2::math::clamp(b, 0.0f, 1.0f));
+ }
+ 
++// Houdini's "Point" light authors a UsdLuxSphereLight with treatAsPoint=true and does not
++// author a radius, so radius falls back to the UsdLux schema default (0.5). Detect that so the
++// SphereLight (and the spotlight lens_radius derived from it) can be shrunk to a near-point.
++static bool
++treatAsPoint(const pxr::SdfPath& id, pxr::HdSceneDelegate* sceneDelegate)
++{
++    static const pxr::TfToken treatAsPointToken("treatAsPoint");
++    pxr::VtValue v = sceneDelegate->GetLightParamValue(id, treatAsPointToken);
++    return v.IsHolding<bool>() && v.UncheckedGet<bool>();
++}
++
++// Small non-zero radius approximating a zero-size point light. MoonRay bakes the sphere radius
++// into the light's transform (SphereLight.cc) and rejects a zero radius as a singular transform
++// ("Invalid transform on light - setting to off"), so a true 0 disables the light. This epsilon
++// keeps the transform valid while staying visually point-like. Paired with forced normalized=true
++// (below) so the tiny emitting area does not scale the light's energy toward zero.
++static constexpr float sTreatAsPointRadius = 0.01f;
++
+ void
+ Light::syncParams(const pxr::SdfPath& id,
+                   pxr::HdSceneDelegate *sceneDelegate,
+@@ -203,30 +224,36 @@ Light::syncParams(const pxr::SdfPath& id,
+         if (attrName == "on" || attrName == "node_xform" || attrName == "intensity") continue;
+ 
+         if (attrName == "geometry") {
+-            // geometry light support is not reliable in this version of Hydra, since access to
+-            // a geometry prim from a light is not anticipated. Correct solution is to use a
+-            // Mesh prim with LightAPI applied
++            // Resolve the emitter geometry path. Prefer the inputs:geometry rel (forwarded by
++            // the MoonrayMeshLight adapter when it is imaged); fall back to the moonray:geometry
++            // string so a carrier-light prim works when the adapter is unavailable (e.g. the
++            // Houdini build, where hdMoonrayAdapters is excluded).
++            pxr::SdfPath geomPath;
+             pxr::VtValue relval = sceneDelegate->Get(id, geometryToken);
+-            // This relies on our custom GeometryLight adapter, which returns a path taken from
+-            // the rel geometry property. It can be broken by the pxr adapter taking precedence,
+-            // which will simply report that GeometryLight is not supported yet.
+             if (relval.IsHolding<pxr::SdfPath>()) {
+-                // Given the path from rel geometry, we need to get the corresponding rprim, and
+-                // thence the RDL geometry object. This implementation is not safe, because it
+-                // assumes that the geom uses the same delegate as the light, but I don't think 
+-                // there is an alternative in Hydra 1
+-                pxr::SdfPath geomPath = relval.UncheckedGet<pxr::SdfPath>();
+-                geomPath.ReplacePrefix(pxr::SdfPath::AbsoluteRootPath(), sceneDelegate->GetDelegateID());
+-                pxr::HdRprim* prim = const_cast<pxr::HdRprim*>(sceneDelegate->GetRenderIndex().GetRprim(geomPath));
++                geomPath = relval.UncheckedGet<pxr::SdfPath>();
++            } else {
++                pxr::VtValue strval = sceneDelegate->GetLightParamValue(id, moonrayGeometryToken);
++                if (strval.IsHolding<std::string>() && !strval.UncheckedGet<std::string>().empty()) {
++                    geomPath = pxr::SdfPath(strval.UncheckedGet<std::string>());
++                }
++            }
++            if (!geomPath.IsEmpty()) {
++                // NB: SdfPath::ReplacePrefix is const and returns a new path — must assign it
++                // (the original code discarded the result).
++                geomPath = geomPath.ReplacePrefix(pxr::SdfPath::AbsoluteRootPath(),
++                                                  sceneDelegate->GetDelegateID());
++                pxr::HdRprim* prim = const_cast<pxr::HdRprim*>(
++                    sceneDelegate->GetRenderIndex().GetRprim(geomPath));
+                 Mesh* mesh = dynamic_cast<Mesh*>(prim);
+                 if (mesh) {
+                     // geometry sync should not be running in parallel with light sync
+                     scene_rdl2::rdl2::SceneObject* geom = mesh->geometryForMeshLight(renderDelegate);
+                     if (geom) {
+-                        mLight->set("geometry",geom);
+-                    } 
+-                } 
+-            } 
++                        mLight->set("geometry", geom);
++                    }
++                }
++            }
+             continue;
+         }
+ 
+@@ -234,7 +261,7 @@ Light::syncParams(const pxr::SdfPath& id,
+         std::string moonrayName = "moonray:"+attrName;
+         pxr::VtValue val = sceneDelegate->GetLightParamValue(id, pxr::TfToken(moonrayName));
+         if (!val.IsEmpty()) {
+-            ValueConverter::setAttribute(mLight, *it, val);
++            ValueConverter::setAttribute(mLight, *it, val, &renderDelegate);
+             continue;
+         }
+ 
+@@ -290,6 +317,18 @@ Light::syncParams(const pxr::SdfPath& id,
+                 const float radius = scene_rdl2::math::sqrt((width * height) / scene_rdl2::math::sPi);
+                 mLight->set(AttributeKey<float>(**it), radius);
+                 continue;
++            } else if (luxName == pxr::HdLightTokens->radius && treatAsPoint(id, sceneDelegate)) {
++                // treatAsPoint=true (Houdini "Point" light): shrink the SphereLight radius /
++                // spotlight lens_radius to a near-point instead of the 0.5 schema default, which
++                // otherwise makes a point behave like a 0.5 sphere with an oversized spot lens.
++                mLight->set(AttributeKey<float>(**it), sTreatAsPointRadius);
++                continue;
++            } else if (luxName == pxr::HdLightTokens->normalize && treatAsPoint(id, sceneDelegate)) {
++                // A point light's intensity is its power. Force normalized=true so the tiny
++                // radius above does not scale the emitted energy toward zero (normalized=false
++                // multiplies radiance by area, which for a near-point is ~0).
++                mLight->set(AttributeKey<bool>(**it), true);
++                continue;
+             } else if (luxName == pxr::HdLightTokens->color) {
+                 pxr::GfVec3f color(1.0f);
+                 val = sceneDelegate->GetLightParamValue(id, luxName);
+@@ -322,7 +361,7 @@ Light::syncParams(const pxr::SdfPath& id,
+                 // schema will cause correct default to be returned
+                 val = sceneDelegate->GetLightParamValue(id, luxName);
+                 if (!val.IsEmpty()) {
+-                    ValueConverter::setAttribute(mLight, *it, val);
++                    ValueConverter::setAttribute(mLight, *it, val, &renderDelegate);
+                     continue;
+                 }
+             }

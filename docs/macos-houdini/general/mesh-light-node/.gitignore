@@ -1,0 +1,6 @@
+# test/render artifacts produced by verify_delegate.sh / verify_hda.py / ad-hoc renders
+*.exr
+*.rdla
+*.log
+*.png
+*.jpg

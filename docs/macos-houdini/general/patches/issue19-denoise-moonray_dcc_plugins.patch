@@ -1,0 +1,784 @@
+diff --git a/houdini/soho/parameters/HdMoonrayRendererPlugin_Global.ds b/houdini/soho/parameters/HdMoonrayRendererPlugin_Global.ds
+index 3133669..ee0cd6e 100644
+--- a/houdini/soho/parameters/HdMoonrayRendererPlugin_Global.ds
++++ b/houdini/soho/parameters/HdMoonrayRendererPlugin_Global.ds
+@@ -81,6 +81,31 @@
+             range   { 0 10 }
+             parmtag { "usdvaluetype" "float" }
+         }
++        parm {
++            name    "xn__moonraysceneVariablefps_control_lrbn"
++            label   "moonray:sceneVariable:fps"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablefps_kebn"
++            label   "Fps"
++            type    float
++            default { "24" }
++            help    "(Frames per second) Affects motion blur."
++            disablewhen "{ xn__moonraysceneVariablefps_control_lrbn == block } { xn__moonraysceneVariablefps_control_lrbn == none }"
++            range   { 0 10 }
++            parmtag { "usdvaluetype" "float" }
++        }
+     }
+ 
+     group {
+@@ -876,6 +901,277 @@
+             disablewhen "{ xn__moonraysceneVariablelock_frame_noise_control_rdcn == block } { xn__moonraysceneVariablelock_frame_noise_control_rdcn == none }"
+             parmtag { "usdvaluetype" "bool" }
+         }
++        parm {
++            name    "xn__moonraysceneVariablesampling_mode_control_v7bn"
++            label   "moonray:sceneVariable:sampling_mode"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablesampling_mode_uubn"
++            label   "Sampling Mode"
++            type    string
++            default { "uniform" }
++            help    "Controls which sampling scheme to use: uniform or adaptive."
++            disablewhen "{ xn__moonraysceneVariablesampling_mode_control_v7bn == block } { xn__moonraysceneVariablesampling_mode_control_v7bn == none }"
++            menu {
++                "uniform"   "Uniform"
++                "adaptive"  "Adaptive"
++            }
++            parmtag { "usdvaluetype" "token" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablemin_adaptive_samples_control_9jcn"
++            label   "moonray:sceneVariable:min_adaptive_samples"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablemin_adaptive_samples_85bn"
++            label   "Min Adaptive Samples"
++            type    integer
++            default { "16" }
++            help    "This is the minimum number of samples taken per pixel before enabling adaptive sampling. A larger number of samples may prevent the adaptive sampler from prematurely identifying an area as converged but may incur a longer running time."
++            disablewhen "{ xn__moonraysceneVariablemin_adaptive_samples_control_9jcn == block } { xn__moonraysceneVariablemin_adaptive_samples_control_9jcn == none }"
++            range   { 0 10 }
++            parmtag { "usdvaluetype" "int" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablemax_adaptive_samples_control_9jcn"
++            label   "moonray:sceneVariable:max_adaptive_samples"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablemax_adaptive_samples_85bn"
++            label   "Max Adaptive Samples"
++            type    integer
++            default { "4096" }
++            help    "When adaptive sampling is turned on, this represents the max number of samples we can throw at a pixel. It's best to err on the high side since adaptive sampling will cull out samples where they're not needed based on the target adaptive error, in which case we should rarely hit the max samples value."
++            disablewhen "{ xn__moonraysceneVariablemax_adaptive_samples_control_9jcn == block } { xn__moonraysceneVariablemax_adaptive_samples_control_9jcn == none }"
++            range   { 0 10 }
++            parmtag { "usdvaluetype" "int" }
++        }
++        parm {
++            name    "xn__moonraysceneVariabletarget_adaptive_error_control_wlcn"
++            label   "moonray:sceneVariable:target_adaptive_error"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariabletarget_adaptive_error_v7bn"
++            label   "Target Adaptive Error"
++            type    float
++            default { "10" }
++            help    "When adaptive sampling is turned on, this represents the desired quality of the output images. Lower values will give higher quality but take longer to render. Higher values will give lower quality but render quicker."
++            disablewhen "{ xn__moonraysceneVariabletarget_adaptive_error_control_wlcn == block } { xn__moonraysceneVariabletarget_adaptive_error_control_wlcn == none }"
++            range   { 0 10 }
++            parmtag { "usdvaluetype" "float" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablelight_sampling_mode_control_nicn"
++            label   "moonray:sceneVariable:light_sampling_mode"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablelight_sampling_mode_m4bn"
++            label   "Light Sampling Mode"
++            type    string
++            default { "uniform" }
++            help    "Controls which light sampling scheme to use:  uniform or adaptive"
++            disablewhen "{ xn__moonraysceneVariablelight_sampling_mode_control_nicn == block } { xn__moonraysceneVariablelight_sampling_mode_control_nicn == none }"
++            menu {
++                "uniform"   "Uniform"
++                "adaptive"  "Adaptive"
++            }
++            parmtag { "usdvaluetype" "token" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablelight_sampling_quality_control_jncn"
++            label   "moonray:sceneVariable:light_sampling_quality"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablelight_sampling_quality_i9bn"
++            label   "Light Sampling Quality"
++            type    float
++            default { "0.5" }
++            help    "When the light sampling mode is 'adaptive', this attribute controls how many lights are sampled per light sample, where 0.0 is low quality (1 light sampled per light sample) and 1.0 is high quality (all lights sampled per light sample). Any value in between will cause adaptive light sampling to kick into effect, meaning that it will choose a higher or lower number of lights depending on what that particular point needs. A number closer to 0.0 will cause it to sample a lower number of lights on average, and vice versa. "
++            disablewhen "{ xn__moonraysceneVariablelight_sampling_quality_control_jncn == block } { xn__moonraysceneVariablelight_sampling_quality_control_jncn == none }"
++            range   { 0 10 }
++            parmtag { "usdvaluetype" "float" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn"
++            label   "moonray:sceneVariable:crypto_uv_attribute_name"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablecrypto_uv_attribute_name_rdcn"
++            label   "Crypto Uv Attribute Name"
++            type    string
++            default { "" }
++            help    "Names of primitive attribute containing crypto UVs"
++            disablewhen "{ xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn == block } { xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn == none }"
++            parmtag { "usdvaluetype" "string" }
++        }
++    }
++    group {
++        name    "denoising_folder"
++        label   "Denoising"
++
++        parm {
++            name    "xn__moonrayenableDenoise_control_pmb"
++            label   "moonray:enableDenoise"
++            type    string
++            default { "set" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonrayenableDenoise_o8a"
++            label   "Denoising"
++            type    toggle
++            default { "1" }
++            disablewhen "{ xn__moonrayenableDenoise_control_pmb == block } { xn__moonrayenableDenoise_control_pmb == none }"
++            help    "Enable denoising of this render output. On macOS the OIDN engine is always used."
++            parmtag { "usdvaluetype" "bool" }
++        }
++        parm {
++            name    "xn__moonrayenableOIDN_control_thb"
++            label   "moonray:enableOIDN"
++            type    string
++            default { "set" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonrayenableOIDN_s3a"
++            label   "Use OIDN Denoising"
++            type    toggle
++            default { "1" }
++            disablewhen "{ xn__moonrayenableDenoise_o8a == 0 } { xn__moonrayenableOIDN_control_thb == block } { xn__moonrayenableOIDN_control_thb == none }"
++            help    "Use OIDN algorithm instead of Optix. Ignored on macOS, where OIDN is always used."
++            parmtag { "usdvaluetype" "bool" }
++        }
++        parm {
++            name    "xn__moonraydenoiseAlbedoGuiding_control_3xb"
++            label   "moonray:denoiseAlbedoGuiding"
++            type    string
++            default { "set" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraydenoiseAlbedoGuiding_2kb"
++            label   "Denoise : Albedo guiding"
++            type    toggle
++            default { "1" }
++            disablewhen "{ xn__moonrayenableDenoise_o8a == 0 } { xn__moonraydenoiseAlbedoGuiding_control_3xb == block } { xn__moonraydenoiseAlbedoGuiding_control_3xb == none }"
++            help    "Use albedo guiding when denoising."
++            parmtag { "usdvaluetype" "bool" }
++        }
++        parm {
++            name    "xn__moonraydenoiseNormalGuiding_control_3xb"
++            label   "moonray:denoiseNormalGuiding"
++            type    string
++            default { "set" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraydenoiseNormalGuiding_2kb"
++            label   "Denoise : Normal guiding"
++            type    toggle
++            default { "1" }
++            disablewhen "{ xn__moonrayenableDenoise_o8a == 0 } { xn__moonraydenoiseNormalGuiding_control_3xb == block } { xn__moonraydenoiseNormalGuiding_control_3xb == none }"
++            help    "Use normal guiding when denoising."
++            parmtag { "usdvaluetype" "bool" }
++        }
+     }
+ 
+     group {
+@@ -2363,6 +2659,133 @@
+             parmtag { "oprelative" "." }
+             parmtag { "usdvaluetype" "<class 'pxr.Usd.Relationship'>" }
+         }
++        parm {
++            name    "xn__moonraysceneVariablebatch_tile_order_control_rdcn"
++            label   "moonray:sceneVariable:batch_tile_order"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablebatch_tile_order_qzbn"
++            label   "Batch Tile Order"
++            type    string
++            default { "morton" }
++            help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for batch rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
++            disablewhen "{ xn__moonraysceneVariablebatch_tile_order_control_rdcn == block } { xn__moonraysceneVariablebatch_tile_order_control_rdcn == none }"
++            menu {
++                "top"               "Top"
++                "bottom"            "Bottom"
++                "left"              "Left"
++                "right"             "Right"
++                "morton"            "Morton"
++                "random"            "Random"
++                "spiral square"     "Spiral Square"
++                "spiral rect"       "Spiral Rect"
++                "morton shiftflip"  "Morton Shiftflip"
++            }
++            parmtag { "usdvaluetype" "token" }
++        }
++        parm {
++            name    "xn__moonraysceneVariableprogressive_tile_order_control_jncn"
++            label   "moonray:sceneVariable:progressive_tile_order"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariableprogressive_tile_order_i9bn"
++            label   "Progressive Tile Order"
++            type    string
++            default { "morton" }
++            help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for progressive rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
++            disablewhen "{ xn__moonraysceneVariableprogressive_tile_order_control_jncn == block } { xn__moonraysceneVariableprogressive_tile_order_control_jncn == none }"
++            menu {
++                "top"               "Top"
++                "bottom"            "Bottom"
++                "left"              "Left"
++                "right"             "Right"
++                "morton"            "Morton"
++                "random"            "Random"
++                "spiral square"     "Spiral Square"
++                "spiral rect"       "Spiral Rect"
++                "morton shiftflip"  "Morton Shiftflip"
++            }
++            parmtag { "usdvaluetype" "token" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn"
++            label   "moonray:sceneVariable:checkpoint_tile_order"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "add"           "![BUTTONS_set_add]Add if Exists"
++                "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariablecheckpoint_tile_order_v7bn"
++            label   "Checkpoint Tile Order"
++            type    string
++            default { "morton" }
++            help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for checkpoint rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
++            disablewhen "{ xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn == block } { xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn == none }"
++            menu {
++                "top"               "Top"
++                "bottom"            "Bottom"
++                "left"              "Left"
++                "right"             "Right"
++                "morton"            "Morton"
++                "random"            "Random"
++                "spiral square"     "Spiral Square"
++                "spiral rect"       "Spiral Rect"
++                "morton shiftflip"  "Morton Shiftflip"
++            }
++            parmtag { "usdvaluetype" "token" }
++        }
++        parm {
++            name    "xn__moonraysceneVariabletwo_stage_output_control_rdcn"
++            label   "moonray:sceneVariable:two_stage_output"
++            type    string
++            default { "none" }
++            menujoin {
++                "set"           "![BUTTONS_set_or_create]Set or Create"
++                "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
++                "block"         "![BUTTONS_set_block]Block"
++                "none"          "![BUTTONS_set_nothing]Do Nothing"
++            }
++            parmtag { "sidefx::look" "icon" }
++        }
++        parm {
++            name    "xn__moonraysceneVariabletwo_stage_output_qzbn"
++            label   "Two Stage Output"
++            type    toggle
++            default { "1" }
++            help    "Specifies whether to use a two-stage writing process for images. In two-stage writing, the image is first written to a temporary location and then moved to the final location. This approach significantly reduces the risk of output data corruption due to an unexpected render process termination.\nThe directory where the temporary files are stored is defined by the \"tmp_dir\" scene variable."
++            disablewhen "{ xn__moonraysceneVariabletwo_stage_output_control_rdcn == block } { xn__moonraysceneVariabletwo_stage_output_control_rdcn == none }"
++            parmtag { "usdvaluetype" "bool" }
++        }
+     }
+ 
+     group {
+@@ -2570,335 +2993,4 @@
+             parmtag { "usdvaluetype" "bool" }
+         }
+     }
+-
+-    parm {
+-        name    "xn__moonraysceneVariablefps_control_lrbn"
+-        label   "moonray:sceneVariable:fps"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablefps_kebn"
+-        label   "Fps"
+-        type    float
+-        default { "24" }
+-        help    "(Frames per second) Affects motion blur."
+-        disablewhen "{ xn__moonraysceneVariablefps_control_lrbn == block } { xn__moonraysceneVariablefps_control_lrbn == none }"
+-        range   { 0 10 }
+-        parmtag { "usdvaluetype" "float" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablesampling_mode_control_v7bn"
+-        label   "moonray:sceneVariable:sampling_mode"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablesampling_mode_uubn"
+-        label   "Sampling Mode"
+-        type    string
+-        default { "uniform" }
+-        help    "Controls which sampling scheme to use: uniform or adaptive."
+-        disablewhen "{ xn__moonraysceneVariablesampling_mode_control_v7bn == block } { xn__moonraysceneVariablesampling_mode_control_v7bn == none }"
+-        menu {
+-            "uniform"   "Uniform"
+-            "adaptive"  "Adaptive"
+-        }
+-        parmtag { "usdvaluetype" "token" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablemin_adaptive_samples_control_9jcn"
+-        label   "moonray:sceneVariable:min_adaptive_samples"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablemin_adaptive_samples_85bn"
+-        label   "Min Adaptive Samples"
+-        type    integer
+-        default { "16" }
+-        help    "This is the minimum number of samples taken per pixel before enabling adaptive sampling. A larger number of samples may prevent the adaptive sampler from prematurely identifying an area as converged but may incur a longer running time."
+-        disablewhen "{ xn__moonraysceneVariablemin_adaptive_samples_control_9jcn == block } { xn__moonraysceneVariablemin_adaptive_samples_control_9jcn == none }"
+-        range   { 0 10 }
+-        parmtag { "usdvaluetype" "int" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablemax_adaptive_samples_control_9jcn"
+-        label   "moonray:sceneVariable:max_adaptive_samples"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablemax_adaptive_samples_85bn"
+-        label   "Max Adaptive Samples"
+-        type    integer
+-        default { "4096" }
+-        help    "When adaptive sampling is turned on, this represents the max number of samples we can throw at a pixel. It's best to err on the high side since adaptive sampling will cull out samples where they're not needed based on the target adaptive error, in which case we should rarely hit the max samples value."
+-        disablewhen "{ xn__moonraysceneVariablemax_adaptive_samples_control_9jcn == block } { xn__moonraysceneVariablemax_adaptive_samples_control_9jcn == none }"
+-        range   { 0 10 }
+-        parmtag { "usdvaluetype" "int" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariabletarget_adaptive_error_control_wlcn"
+-        label   "moonray:sceneVariable:target_adaptive_error"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariabletarget_adaptive_error_v7bn"
+-        label   "Target Adaptive Error"
+-        type    float
+-        default { "10" }
+-        help    "When adaptive sampling is turned on, this represents the desired quality of the output images. Lower values will give higher quality but take longer to render. Higher values will give lower quality but render quicker."
+-        disablewhen "{ xn__moonraysceneVariabletarget_adaptive_error_control_wlcn == block } { xn__moonraysceneVariabletarget_adaptive_error_control_wlcn == none }"
+-        range   { 0 10 }
+-        parmtag { "usdvaluetype" "float" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablelight_sampling_mode_control_nicn"
+-        label   "moonray:sceneVariable:light_sampling_mode"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablelight_sampling_mode_m4bn"
+-        label   "Light Sampling Mode"
+-        type    string
+-        default { "uniform" }
+-        help    "Controls which light sampling scheme to use:  uniform or adaptive"
+-        disablewhen "{ xn__moonraysceneVariablelight_sampling_mode_control_nicn == block } { xn__moonraysceneVariablelight_sampling_mode_control_nicn == none }"
+-        menu {
+-            "uniform"   "Uniform"
+-            "adaptive"  "Adaptive"
+-        }
+-        parmtag { "usdvaluetype" "token" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablelight_sampling_quality_control_jncn"
+-        label   "moonray:sceneVariable:light_sampling_quality"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablelight_sampling_quality_i9bn"
+-        label   "Light Sampling Quality"
+-        type    float
+-        default { "0.5" }
+-        help    "When the light sampling mode is 'adaptive', this attribute controls how many lights are sampled per light sample, where 0.0 is low quality (1 light sampled per light sample) and 1.0 is high quality (all lights sampled per light sample). Any value in between will cause adaptive light sampling to kick into effect, meaning that it will choose a higher or lower number of lights depending on what that particular point needs. A number closer to 0.0 will cause it to sample a lower number of lights on average, and vice versa. "
+-        disablewhen "{ xn__moonraysceneVariablelight_sampling_quality_control_jncn == block } { xn__moonraysceneVariablelight_sampling_quality_control_jncn == none }"
+-        range   { 0 10 }
+-        parmtag { "usdvaluetype" "float" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn"
+-        label   "moonray:sceneVariable:crypto_uv_attribute_name"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablecrypto_uv_attribute_name_rdcn"
+-        label   "Crypto Uv Attribute Name"
+-        type    string
+-        default { "" }
+-        help    "Names of primitive attribute containing crypto UVs"
+-        disablewhen "{ xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn == block } { xn__moonraysceneVariablecrypto_uv_attribute_name_control_sqcn == none }"
+-        parmtag { "usdvaluetype" "string" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablebatch_tile_order_control_rdcn"
+-        label   "moonray:sceneVariable:batch_tile_order"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablebatch_tile_order_qzbn"
+-        label   "Batch Tile Order"
+-        type    string
+-        default { "morton" }
+-        help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for batch rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
+-        disablewhen "{ xn__moonraysceneVariablebatch_tile_order_control_rdcn == block } { xn__moonraysceneVariablebatch_tile_order_control_rdcn == none }"
+-        menu {
+-            "top"               "Top"
+-            "bottom"            "Bottom"
+-            "left"              "Left"
+-            "right"             "Right"
+-            "morton"            "Morton"
+-            "random"            "Random"
+-            "spiral square"     "Spiral Square"
+-            "spiral rect"       "Spiral Rect"
+-            "morton shiftflip"  "Morton Shiftflip"
+-        }
+-        parmtag { "usdvaluetype" "token" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariableprogressive_tile_order_control_jncn"
+-        label   "moonray:sceneVariable:progressive_tile_order"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariableprogressive_tile_order_i9bn"
+-        label   "Progressive Tile Order"
+-        type    string
+-        default { "morton" }
+-        help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for progressive rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
+-        disablewhen "{ xn__moonraysceneVariableprogressive_tile_order_control_jncn == block } { xn__moonraysceneVariableprogressive_tile_order_control_jncn == none }"
+-        menu {
+-            "top"               "Top"
+-            "bottom"            "Bottom"
+-            "left"              "Left"
+-            "right"             "Right"
+-            "morton"            "Morton"
+-            "random"            "Random"
+-            "spiral square"     "Spiral Square"
+-            "spiral rect"       "Spiral Rect"
+-            "morton shiftflip"  "Morton Shiftflip"
+-        }
+-        parmtag { "usdvaluetype" "token" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn"
+-        label   "moonray:sceneVariable:checkpoint_tile_order"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "add"           "![BUTTONS_set_add]Add if Exists"
+-            "multiply"      "![BUTTONS_set_multiply]Multiply if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariablecheckpoint_tile_order_v7bn"
+-        label   "Checkpoint Tile Order"
+-        type    string
+-        default { "morton" }
+-        help    "Specifies the order in which tiles (as areas of 8x8 pixels) are prioritized for checkpoint rendering, which determines which areas of the image are rendered first. The ordering is not guaranteed: the strict sequence of tile starting and completion for any pass is nondeterministic due to thread scheduling."
+-        disablewhen "{ xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn == block } { xn__moonraysceneVariablecheckpoint_tile_order_control_wlcn == none }"
+-        menu {
+-            "top"               "Top"
+-            "bottom"            "Bottom"
+-            "left"              "Left"
+-            "right"             "Right"
+-            "morton"            "Morton"
+-            "random"            "Random"
+-            "spiral square"     "Spiral Square"
+-            "spiral rect"       "Spiral Rect"
+-            "morton shiftflip"  "Morton Shiftflip"
+-        }
+-        parmtag { "usdvaluetype" "token" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariabletwo_stage_output_control_rdcn"
+-        label   "moonray:sceneVariable:two_stage_output"
+-        type    string
+-        default { "none" }
+-        menujoin {
+-            "set"           "![BUTTONS_set_or_create]Set or Create"
+-            "setexisting"   "![BUTTONS_set_if_exists]Set if Exists"
+-            "block"         "![BUTTONS_set_block]Block"
+-            "none"          "![BUTTONS_set_nothing]Do Nothing"
+-        }
+-        parmtag { "sidefx::look" "icon" }
+-    }
+-    parm {
+-        name    "xn__moonraysceneVariabletwo_stage_output_qzbn"
+-        label   "Two Stage Output"
+-        type    toggle
+-        default { "1" }
+-        help    "Specifies whether to use a two-stage writing process for images. In two-stage writing, the image is first written to a temporary location and then moved to the final location. This approach significantly reduces the risk of output data corruption due to an unexpected render process termination.\nThe directory where the temporary files are stored is defined by the \"tmp_dir\" scene variable."
+-        disablewhen "{ xn__moonraysceneVariabletwo_stage_output_control_rdcn == block } { xn__moonraysceneVariabletwo_stage_output_control_rdcn == none }"
+-        parmtag { "usdvaluetype" "bool" }
+-    }
+ }

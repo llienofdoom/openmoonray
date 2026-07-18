@@ -1,0 +1,30 @@
+{
+    "git_repo_name": "houdini_moonray",
+    "git_remotes": [
+        "git@github.anim.dreamworks.com:bwalters/houdini_moonray.git",
+        "git@github.anim.dreamworks.com:Houdini/houdini_moonray.git"
+    ],
+    "description": "",
+    "install_path": "/usr/pic1/work/houdini_moonray/houdini_moonray/data/houdini/otls/Vop::DW::Moonray_Types_Atom::1.hda",
+    "jira_labels": [
+        "HSITE",
+        "OTL"
+    ],
+    "internal_nodes": [],
+    "jira_authors": [
+        "mtitus",
+        "bwalters",
+        "drizeakos"
+    ],
+    "revisions": [
+        {
+            "comment": "[MNT] tweaked on create script",
+            "houdini_version": "16.0.877",
+            "author": "bwalters",
+            "source": "/rel/packages/houdini_moonray/3.56.1.1/houdini-16.0.877/houdini/16.0.877_64/otls/Vop::DW::Moonray_Types_Atom::1.hda",
+            "version": "1.0",
+            "time": "Wed Mar 20 10:59:03 2019",
+            "source_version": ""
+        }
+    ]
+}
