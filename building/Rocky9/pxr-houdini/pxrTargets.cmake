@@ -18,8 +18,8 @@ cmake_policy(VERSION 2.6...3.21)
 set(CMAKE_IMPORT_FILE_VERSION 1)
 
 
-set(HPYTHONLIB $ENV{HOUDINI_INSTALL_DIR}/python/lib/libpython3.9${CMAKE_SHARED_LIBRARY_SUFFIX})
-SET(HPYTHONINC $ENV{HOUDINI_INSTALL_DIR}/python/include/python3.9)
+set(HPYTHONLIB $ENV{HOUDINI_INSTALL_DIR}/python/lib/libpython3.11${CMAKE_SHARED_LIBRARY_SUFFIX})
+SET(HPYTHONINC $ENV{HOUDINI_INSTALL_DIR}/python/include/python3.11)
 
 # Protect against multiple inclusion, which would fail when already imported targets are added once more.
 set(_targetsDefined)

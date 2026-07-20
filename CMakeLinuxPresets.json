@@ -37,15 +37,16 @@
             "inherits": "rocky9-environment",
             "environment": {
                 "PREFIX_PXR"                : "${sourceDir}/building/Rocky9/pxr-houdini",
-                "HOUDINI_INSTALL_DIR"       : "/opt/hfs20.0",
+                "HOUDINI_INSTALL_DIR"       : "/opt/hfs20.5.939",
                 "PXR_LIB_PREFIX"            : "$env{HOUDINI_INSTALL_DIR}/dsolib",
                 "PXR_INCLUDE_PREFIX"        : "$env{HOUDINI_INSTALL_DIR}/toolkit/include",
-                "PXR_BOOST_PYTHON_LIB"      : "$env{HOUDINI_INSTALL_DIR}/dsolib/libhboost_python39-mt-x64.so",
+                "PXR_BOOST_PYTHON_LIB"      : "$env{HOUDINI_INSTALL_DIR}/dsolib/libhboost_python311-mt-x64.so",
                 "PXR_DEPS_PREFIX"           : "$env{DEPS_ROOT}"
             },
             "cacheVariables": {
                 "CMAKE_PREFIX_PATH": "$env{DEPS_ROOT};$env{PREFIX_PXR}",
-                "MOONRAY_USE_HOUDINI": "TRUE"
+                "MOONRAY_USE_HOUDINI": "TRUE",
+                "CMAKE_CXX_FLAGS": "-isystem $env{PXR_INCLUDE_PREFIX}"
             }
         },
         {
@@ -66,7 +67,10 @@
             "binaryDir": "$env{BUILD_DIR}",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/../installs/openmoonray"
+                "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/../installs/openmoonray-houdini",
+                "BUILD_QT_APPS": "NO",
+                "BUILD_TESTING": "OFF",
+                "MOONRAY_USE_OPTIX": "NO"
             },
             "generator": "Unix Makefiles"
         }

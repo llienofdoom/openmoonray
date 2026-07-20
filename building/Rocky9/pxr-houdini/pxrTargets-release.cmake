@@ -421,12 +421,12 @@ list(APPEND _IMPORT_CHECK_FILES_FOR_usdImagingGL "${_LIB_PREFIX}/libpxr_usdImagi
 # Import target "usdRiImaging" for configuration "Release"
 set_property(TARGET usdRiImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(usdRiImaging PROPERTIES
-  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiImaging${CMAKE_SHARED_LIBRARY_SUFFIX}"
-  IMPORTED_SONAME_RELEASE "libpxr_usdRiImaging${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  IMPORTED_LOCATION_RELEASE "${_LIB_PREFIX}/libpxr_usdRiPxrImaging${CMAKE_SHARED_LIBRARY_SUFFIX}"
+  IMPORTED_SONAME_RELEASE "libpxr_usdRiPxrImaging${CMAKE_SHARED_LIBRARY_SUFFIX}"
   )
 
 list(APPEND _IMPORT_CHECK_TARGETS usdRiImaging )
-list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiImaging${CMAKE_SHARED_LIBRARY_SUFFIX}" )
+list(APPEND _IMPORT_CHECK_FILES_FOR_usdRiImaging "${_LIB_PREFIX}/libpxr_usdRiPxrImaging${CMAKE_SHARED_LIBRARY_SUFFIX}" )
 
 # Import target "usdSkelImaging" for configuration "Release"
 set_property(TARGET usdSkelImaging APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
