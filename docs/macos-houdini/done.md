@@ -7,10 +7,16 @@ Completed steps in the Moonray macOS build process.
 Ran the full documented bootstrap from a **freshly relocated/cloned tree** with empty
 `installs/`, `build/`, `build-deps/` (new folder at `/Applications/MoonRay/source/openmoonray`,
 symlinks re-created): deps build (`NO_USD`) → post-deps fixups → Houdini configure/build/install
-→ husk render. **Result: verified end-to-end** — `two_triangles_delta/scene.usd` rendered via
-husk (`RdlMeshGeometry` + `PerspectiveCamera` + `UsdPreviewSurface` + `DistantLight` in the RDL2
-dump; EXR with real HDR content, Max 2.69 / Avg 0.22). 26 deps built (USD excluded), full MoonRay
-+ hdMoonray compiled clean, 163 shader `.so` + 175 `shader_json` installed.
+→ husk render. **Result: verified end-to-end via all three render paths** —
+1. **husk sign-off render** — `two_triangles_delta/scene.usd` (`RdlMeshGeometry` +
+   `PerspectiveCamera` + `UsdPreviewSurface` + `DistantLight` in the RDL2 dump; EXR with real
+   HDR content, Max 2.69 / Avg 0.22).
+2. **Interactive Houdini** (user-confirmed) — prior scenes open and render as before; all
+   accumulated delegate/otls/shader work survived the rebuild intact.
+3. **CLI** (user-confirmed) — `moonusd` husk render passed.
+
+26 deps built (USD excluded), full MoonRay + hdMoonray compiled clean, 163 shader `.so` + 175
+`shader_json` installed.
 
 **This is exactly the value of the sign-off: it surfaced five real defects on the documented
 bootstrap path, all now fixed in committed source** (none were caught before because the prior
