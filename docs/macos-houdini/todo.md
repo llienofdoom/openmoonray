@@ -7,8 +7,10 @@ Work moved from the patch-shuffle model to committed source in `github.com/llien
 `docs/research/fork-based-workflow.md` and the `done.md` entry. Existing items below are
 preserved as historical record. Remaining verification:
 
-- [ ] Full from-scratch deps build + compile of the fork on a clean machine (multi-hour; the
-      git/source resolution is verified, byte-identical to the built tree — this is the final sign-off).
+- [x] Full from-scratch deps build + compile of the fork on a clean machine — **DONE 2026-07-20**
+      (freshly relocated tree, empty installs/build/build-deps). Rendered end-to-end via husk.
+      Surfaced + fixed five committed-source defects on the documented bootstrap path — see
+      `done.md` "From-Scratch Build Sign-Off". This closes the final sign-off.
 
 ## Pre-Build Decisions (needs your input)
 

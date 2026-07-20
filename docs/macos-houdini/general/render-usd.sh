@@ -36,4 +36,6 @@ CAM_ARG=()
 [ -n "$CAM" ] && CAM_ARG=(--camera "$CAM")
 
 echo "husk -> $OUT  (frame $FRAME${CAM:+, camera $CAM})"
-exec "$HUSK" -R HdMoonrayRendererPlugin -o "$OUT" -f "$FRAME" "${CAM_ARG[@]}" "$SCENE"
+# ${CAM_ARG[@]+...} guards the empty-array expansion: under `set -u`, macOS's default
+# bash 3.2 treats "${CAM_ARG[@]}" on an empty array as an unbound variable and aborts.
+exec "$HUSK" -R HdMoonrayRendererPlugin -o "$OUT" -f "$FRAME" ${CAM_ARG[@]+"${CAM_ARG[@]}"} "$SCENE"

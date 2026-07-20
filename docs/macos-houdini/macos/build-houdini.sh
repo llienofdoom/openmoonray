@@ -50,10 +50,13 @@ if [[ ! -d "$XCODEPROJ" ]]; then
     exit 1
 fi
 
-# Ensure standalone pxr headers are present before we disable them
+# If the standalone USD 22.11 pxr headers aren't installed there is no header race to
+# guard against — nothing to disable. This is the normal state for a Houdini-only deps
+# build (cmake -DNO_USD=1 ...), where USD is never built into installs/include/pxr.
+# clang then falls through to Houdini's toolkit USD 24.3 headers on its own.
 if [[ ! -d "$PXR_INCLUDE" && ! -d "$PXR_INCLUDE_DISABLED" ]]; then
-    echo "ERROR: Neither $PXR_INCLUDE nor $PXR_INCLUDE_DISABLED found"
-    exit 1
+    echo "No standalone installs/include/pxr present (NO_USD deps build) — no USD 22.11"
+    echo "header race to guard against; building directly against Houdini's toolkit USD."
 fi
 
 # Restore function — always re-enable standalone pxr headers on exit

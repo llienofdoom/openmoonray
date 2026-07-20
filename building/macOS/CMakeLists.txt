@@ -84,8 +84,17 @@ set(CHAIN Lua)
 ExternalProject_Add(MicroHttpd
     URL https://ftp.gnu.org/gnu/libmicrohttpd/libmicrohttpd-0.9.72.tar.gz
     BUILD_IN_SOURCE 1
-    CONFIGURE_COMMAND ./configure --prefix ${InstallRoot}
-    BUILD_COMMAND make ${JOBS_ARG}
+    # macOS fix (build-issues.md Issues 1 & 3): the 0.9.72 tarball's Makefile hardcodes the
+    # versioned autotools `aclocal-1.16`/`automake-1.16` in its maintainer-mode regen rules
+    # (it was autotooled with automake 1.16). On systems with automake 1.18 those versioned
+    # tools don't exist, so `make install` fails (Error 127) the moment it decides an
+    # autotools output looks stale. Override the regen tools to no-ops (`:`) so those rules
+    # succeed without regenerating — the shipped autotools outputs are used as-is. This is
+    # robust where timestamp-touching is not (configure re-establishes broken mtime orders).
+    # --disable-doc + MAKEINFO=: drop the `makeinfo` dependency for the info docs.
+    CONFIGURE_COMMAND ./configure --prefix ${InstallRoot} --disable-doc
+    BUILD_COMMAND make ${JOBS_ARG} ACLOCAL=: AUTOCONF=: AUTOMAKE=: AUTOHEADER=: MAKEINFO=:
+    INSTALL_COMMAND make install ACLOCAL=: AUTOCONF=: AUTOMAKE=: AUTOHEADER=: MAKEINFO=:
     DEPENDS ${CHAIN}
 )
 set(CHAIN MicroHttpd)

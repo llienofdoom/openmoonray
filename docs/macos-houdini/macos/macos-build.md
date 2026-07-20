@@ -89,8 +89,11 @@ The `-j8` flag is passed through to the underlying make, parallelising each dep'
 
 **Houdini variant:** skip USD (Houdini provides its own):
 ```bash
-cmake -DNOUSD=1 ../building/macOS
+cmake -DNO_USD=1 ../building/macOS
 ```
+> The CMake option is `NO_USD` (checked as `if(NOT NO_USD)` in `building/macOS/CMakeLists.txt`).
+> `-DNOUSD=1` (no underscore) is silently ignored — CMake warns "variable not used" and USD is
+> built into `installs/` anyway. Several upstream docs carry this typo; use `NO_USD`.
 
 > **Warning:** If switching between USD and non-USD dep builds, delete `build-deps/` and `installs/` first. Leftover USD artifacts will cause linker failures in Step 4.
 
@@ -262,7 +265,7 @@ All deps are built from source or downloaded as pre-built binaries. Homebrew is 
 | OpenImageIO | 2.3.20.0 | With Python, without Qt |
 | OpenImageDenoise | v2.2.0 | **Pre-built arm64 macOS binary** (not compiled) |
 | Qt5 | 5.12.12 | Built from source, `arm64` only |
-| USD | v22.11 | Python 3.9 from Xcode, skippable with `-DNOUSD=1` |
+| USD | v22.11 | Python 3.9 from Xcode, skippable with `-DNO_USD=1` |
 | libuuid | 1.0.3 | |
 | OpenSSL | 3.0.8 | 3.1.0 has a bug on Apple Silicon — intentionally downgraded |
 | libcurl | 7.88.1 | `--with-secure-transport` |

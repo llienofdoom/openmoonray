@@ -40,10 +40,10 @@ You can add arguments `--nocuda` and `--noqt` to skip GPU and GUI support respec
 ---
 ### Step 4. Build the remaining dependencies from source
 Note: If building for Houdini you'll need to build moonray against Houdini's USD libraries.
-You'll want to skip building USD during this step by adding `-DNOUSD=1` to the first cmake
+You'll want to skip building USD during this step by adding `-DNO_USD=1` to the first cmake
 command below: `cmake -DNO_USD=1 ../source/openmoonray/building/Rocky9`.  You should clean
 the build-deps/ and installs/ directory if you have previously installed the dependencies
-without passing -DNOUSD=1, to remove any USD related files or step 5 may fail to link to
+without passing -DNO_USD=1, to remove any USD related files or step 5 may fail to link to
 Houdini's USD libs.
 ```
 cd /opt/MoonRay/build-deps

@@ -45,7 +45,7 @@ patch step. A full machine also needs, per `docs/macos-houdini/macos/macos-build
    clone into `/Applications/MoonRay/source/openmoonray`, then
    `ln -s source/openmoonray /Applications/MoonRay/openmoonray` and `ln -s source/openmoonray/building /Applications/MoonRay/building`.
 2. **Dependencies** built from source into `installs/` — Houdini variant skips USD:
-   `cd build-deps && cmake -DNOUSD=1 ../building/macOS && cmake --build . -- -j8` (multi-hour).
+   `cd build-deps && cmake -DNO_USD=1 ../building/macOS && cmake --build . -- -j8` (multi-hour).
 3. **Houdini 20.5.939** at `/Applications/Houdini/Houdini20.5.939`.
 
 ## Building (Houdini)

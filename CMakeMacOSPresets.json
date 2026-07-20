@@ -65,7 +65,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "CMAKE_INSTALL_PREFIX": "${sourceParentDir}/installs/openmoonray-houdini",
-                "BUILD_QT_APPS": "NO"
+                "BUILD_QT_APPS": "NO",
+                "BUILD_TESTING": "OFF"
             },
             "generator": "Xcode"
         }

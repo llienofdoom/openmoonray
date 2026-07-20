@@ -2,6 +2,45 @@
 
 Completed steps in the Moonray macOS build process.
 
+## From-Scratch Build Sign-Off — COMPLETE ✅ (2026-07-20)
+
+Ran the full documented bootstrap from a **freshly relocated/cloned tree** with empty
+`installs/`, `build/`, `build-deps/` (new folder at `/Applications/MoonRay/source/openmoonray`,
+symlinks re-created): deps build (`NO_USD`) → post-deps fixups → Houdini configure/build/install
+→ husk render. **Result: verified end-to-end** — `two_triangles_delta/scene.usd` rendered via
+husk (`RdlMeshGeometry` + `PerspectiveCamera` + `UsdPreviewSurface` + `DistantLight` in the RDL2
+dump; EXR with real HDR content, Max 2.69 / Avg 0.22). 26 deps built (USD excluded), full MoonRay
++ hdMoonray compiled clean, 163 shader `.so` + 175 `shader_json` installed.
+
+**This is exactly the value of the sign-off: it surfaced five real defects on the documented
+bootstrap path, all now fixed in committed source** (none were caught before because the prior
+build tree was never rebuilt from zero):
+
+1. **`NOUSD` → `NO_USD`** typo in CLAUDE.md + 4 build docs. The CMake option is `NO_USD`
+   (`building/macOS/CMakeLists.txt` `if(NOT NO_USD)`); `-DNOUSD=1` is silently ignored (CMake
+   warns "variable not used") and USD 22.11 gets built into `installs/` anyway — the stale-USD
+   condition that breaks Houdini `libpxr_*` linkage.
+2. **MicroHttpd autotools trap** (`building/macOS/CMakeLists.txt`) — the documented Issue 1/3 fix
+   was never actually committed. The 0.9.72 tarball's Makefile hardcodes `aclocal-1.16`/
+   `automake-1.16`; on automake 1.18 `make install` fails (Error 127). Fixed robustly by
+   overriding the regen tools to no-ops (`ACLOCAL=: AUTOCONF=: AUTOMAKE=: AUTOHEADER=: MAKEINFO=:`)
+   on build + install, plus `--disable-doc`. (Timestamp-touching — the old documented approach —
+   is fragile: `./configure` re-establishes broken mtime orders. Verified the override installs
+   `libmicrohttpd` cleanly.)
+3. **`build-houdini.sh` hard-required `installs/include/pxr`** — but a `NO_USD` deps build never
+   creates it, so the wrapper errored on its own happy path. Now: no standalone pxr = no USD
+   22.11 header race, proceed directly against Houdini's toolkit USD.
+4. **Xcode dependency cycle** `EnvLight` ↔ `moonray_rendering_pbr_tests` failed the full build.
+   Tests aren't needed for the render path; added `BUILD_TESTING: OFF` to the
+   `macos-houdini-release` preset (`CMakeMacOSPresets.json`).
+5. **`render-usd.sh`** broke under macOS's default bash 3.2 (`set -u` + empty `"${CAM_ARG[@]}"`
+   → unbound variable) on the no-camera invocation; and lacked its execute bit. Fixed the
+   empty-array guard and `chmod +x`.
+
+Operational note learned: the deps `ExternalProject` build **cannot be incrementally resumed** —
+git-based deps re-run their `update` step on every `cmake --build` and cascade a rebuild
+downstream, defeating stamp-touching. Run the deps build uninterrupted in one pass.
+
 ## Fork-Based Workflow Migration — COMPLETE ✅ (2026-07-18)
 
 Replaced the patch-shuffle model (uncommitted edits + `.patch` files here) with **committed
@@ -16,8 +55,8 @@ feature) and separated hotl `*.hda.orig` noise (now git-ignored). Verified: clea
 step; forked-module content byte-identical to the build tree. **This repo is retained as the
 research/history archive.** Full detail: `docs/research/fork-based-workflow.md`.
 
-Not yet run: a full from-scratch deps build + compile of the fork (multi-hour; committed bytes are
-identical to the already-built-and-render-verified tree).
+Full from-scratch deps build + compile of the fork: **done 2026-07-20** — see the
+"From-Scratch Build Sign-Off" entry above (surfaced + fixed five committed-source defects).
 
 ## Houdini TAB Menu Consolidation — COMPLETE ✅ (2026-07-07)
 
