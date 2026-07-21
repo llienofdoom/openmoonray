@@ -17,15 +17,18 @@ the `openmoonray-houdini` install. Use it to confirm a delegate or otls change e
 
 ## Render
 
-Use the committed wrapper `docs/macos-houdini/general/render-usd.sh` (sets exactly the right
-env, then execs husk):
+Use the committed wrapper `scripts/render-usd.sh` — one cross-OS script (macOS + Rocky 9),
+installed to `$OMR/bin/render-usd` by the build. It sets exactly the right env, hard-codes the
+renderer/complexity/frame-count args, then execs husk; the input file is the first arg and
+everything after it passes straight through to husk:
 
 ```bash
-docs/macos-houdini/general/render-usd.sh scene.usda [out.exr] [/cameras/render_cam] [frame]
+scripts/render-usd.sh scene.usda --frame 1 --output out.exr [--camera /cameras/render_cam]
+# or, once $OMR/bin is on PATH:  render-usd scene.usda --frame 1 --output out.exr
 ```
 
-The user's local equivalent is the `moonusd` helper (adds OCIO ACES 1.2). Test scenes live in
-`~/Desktop/moonray_tests/`. Launch Houdini itself with `moonhou`.
+The user's local macOS equivalent is the `moonusd` helper (adds OCIO ACES 1.2). Test scenes
+live in `~/Desktop/moonray_tests/`. Launch Houdini itself with `moonhou`.
 
 ## Debugging: dump the RDL2 scene the delegate built
 
@@ -33,7 +36,7 @@ The single most useful tool for "what did the delegate translate?":
 
 ```bash
 export HDMOONRAY_RDLA_OUTPUT=/tmp/dump.rdla
-docs/macos-houdini/general/render-usd.sh scene.usda
+scripts/render-usd.sh scene.usda
 # then inspect /tmp/dump.rdla — light classes, treatAsPoint, SceneObject refs, etc.
 ```
 

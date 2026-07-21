@@ -82,16 +82,21 @@ $OMR/bin/rdl2_json_exporter --out $OMR/shader_json --sparse
 
 ## 5. Render sign-off (husk)
 
+The render helper is the cross-OS `scripts/render-usd.sh`, installed to
+`$OMR/bin/render-usd` by the build (first arg = input USD; remaining args pass
+through to husk). On Linux it scrubs Houdini's `dsolib` itself and sets the
+minimal husk env (never source `setup.sh` for husk — its PYTHONPATH crashes it).
+
 ```bash
 export HDMOONRAY_RDLA_OUTPUT=/tmp/dump.rdla   # optional: dump the translated RDL2 scene
-docs/rocky9-houdini/general/render-usd.sh \
-    moonray/hydra/hdMoonray/testSuite/geometry/two_triangles_delta/scene.usd /tmp/out.exr
+$OMR/bin/render-usd \
+    moonray/hydra/hdMoonray/testSuite/geometry/two_triangles_delta/scene.usd \
+    --frame 1 --output /tmp/out.exr
 ```
 
-`render-usd.sh` scrubs Houdini's `dsolib` itself and sets the minimal husk env
-(never source `setup.sh` for husk — its PYTHONPATH crashes it). Verified: exit 0,
-non-black EXR (avg ≈0.22, max ≈2.69), RDL2 dump with `RdlMeshGeometry` +
-`PerspectiveCamera` + `UsdPreviewSurface` + `DistantLight`, arras/mcrt on CPU.
+Verified: exit 0, non-black EXR (avg ≈0.22, max ≈2.69), RDL2 dump with
+`RdlMeshGeometry` + `PerspectiveCamera` + `UsdPreviewSurface` + `DistantLight`,
+arras/mcrt on CPU.
 
 **OIDN denoise on CPU** (the CPU-only payoff): the delegate auto-selects OIDN
 because OptiX is compiled out (`MOONRAY_USE_OPTIX=NO` ⇒ `HDMOONRAY_NO_OPTIX`;
@@ -99,7 +104,7 @@ hdMoonray `ArrasSettings.cc:302`). Verify:
 
 ```bash
 export HDMOONRAY_ENABLE_DENOISE=true     # deliberately DON'T set _OIDN — exercises the auto-select
-docs/rocky9-houdini/general/render-usd.sh .../two_triangles_delta/scene.usd /tmp/denoise.exr
+$OMR/bin/render-usd .../two_triangles_delta/scene.usd --frame 1 --output /tmp/denoise.exr
 ```
 
 Confirmed: render succeeds with **no** `"Optix mode not supported in this build"`

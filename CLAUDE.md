@@ -135,11 +135,18 @@ nodes, menu, shader mapping). The `patches/` folders are a **historical** develo
 the changes are already committed on the `macos-houdini` branches — you do not apply them to
 build.
 
-`docs/rocky9-houdini/` — the Linux sibling, same split: **`rocky9/`** (platform-specific:
-`rocky9-build.md` build log, `build-issues.md` for the two Houdini-env-shadowing issues,
-`build-env.sh` shell scrub) and **`general/`** (`render-usd.sh` husk wrapper — the Linux port
-of the macOS one). Cross-platform delegate/node/shader work lives under `docs/macos-houdini/
-general/` and is not duplicated here.
+`docs/rocky9-houdini/` — the Linux sibling: **`rocky9/`** (platform-specific: `rocky9-build.md`
+build log, `build-issues.md` for the two Houdini-env-shadowing issues, `build-env.sh` shell
+scrub). Cross-platform delegate/node/shader work lives under `docs/macos-houdini/general/` and
+is not duplicated here.
+
+The **husk render helper is a single cross-OS script**, `scripts/render-usd.sh` — installed to
+`$OMR/bin/render-usd` by the build (`scripts/CMakeLists.txt`). It picks `OMR`/`HFS` by
+`uname` (macOS vs Rocky 9; Windows TBD), scrubs Houdini's `dsolib` on Linux, hard-codes the
+renderer/complexity/frame args, and passes the first arg (input USD) + everything after it
+(`--frame`, `--output`, `--camera`, …) through to husk. `--complexity 1` is deliberate — it
+caps subdiv tessellation, without which heavy scenes OOM-kill the `mcrt` process in renderPrep.
+The user's local macOS equivalent is `moonusd`.
 
 ## Conventions
 
