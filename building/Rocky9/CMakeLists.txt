@@ -132,6 +132,32 @@ ExternalProject_Add(TBB
 )
 set(CHAIN TBB)
 
+# OpenVDB is source-built into ${InstallRoot} (not taken from the dnf package)
+# specifically for the Houdini build: Houdini's toolkit/include ships its own
+# OpenVDB 11 (namespace v11_0_sesi). The Houdini preset adds that dir as a
+# -isystem fallback AFTER ${InstallRoot}/include, so whichever OpenVDB headers
+# live in ${InstallRoot}/include win the include race. The dnf OpenVDB only
+# lands headers in /usr/include (searched last), so MoonRay would compile
+# against Houdini's v11 headers but link the dnf v9.1 lib -> undefined
+# references to openvdb::v11_0_sesi::*. Installing our own 9.1 into
+# ${InstallRoot} (matching building/macOS) makes OpenVDB_ROOT=${DEPS_ROOT}
+# correct and keeps compile+link on the same 9.1. Blosc/Boost/zlib come from
+# the system (dnf); TBB/Imath from ${InstallRoot}.
+ExternalProject_Add(OpenVDB
+    GIT_REPOSITORY https://github.com/AcademySoftwareFoundation/openvdb
+    GIT_TAG ab935574cdb25c3df66b068fce2a3b0a74281c54 # v9.1.0
+    PATCH_COMMAND patch -p1 -N < ${CMAKE_CURRENT_SOURCE_DIR}/OpenVDB.patch || true
+    INSTALL_DIR ${InstallRoot}
+    CMAKE_ARGS
+        -DCMAKE_PREFIX_PATH:PATH=${InstallRoot}
+        -DTBB_ROOT=${InstallRoot}
+        -DBoost_NO_BOOST_CMAKE=ON
+        -DOPENVDB_BUILD_BINARIES=OFF
+        -DCMAKE_INSTALL_PREFIX:PATH=<INSTALL_DIR>
+    DEPENDS ${CHAIN}
+)
+set(CHAIN OpenVDB)
+
 ExternalProject_Add(OpenImageDenoise
     URL https://github.com/OpenImageDenoise/oidn/releases/download/v2.3.3/oidn-2.3.3.src.tar.gz
     INSTALL_DIR ${InstallRoot}
