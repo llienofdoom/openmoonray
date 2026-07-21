@@ -1,13 +1,19 @@
-# Open MoonRay — macOS / Houdini fork (single source of truth)
+# Open MoonRay — macOS + Rocky 9 / Houdini fork (single source of truth)
 
 This is a **personal fork** of Open MoonRay focused on building and extending the renderer
-on **macOS** with a **Houdini** front-end (the hdMoonray Hydra delegate + Houdini DCC
-plugins). All accumulated build/dev/test knowledge lives **here**, in this superproject —
-including notes about the two forked submodules. Do not split Claude context across the
-submodule forks; they carry only a one-line pointer back here.
+with a **Houdini** front-end (the hdMoonray Hydra delegate + Houdini DCC plugins) on **two
+OSes from one shared branch**: **macOS** (Apple Silicon, dev/iteration) and **Rocky Linux 9**
+(headless, CPU-only render servers). All accumulated build/dev/test knowledge lives **here**,
+in this superproject — including notes about the two forked submodules. Do not split Claude
+context across the submodule forks; they carry only a one-line pointer back here.
 
-Active branch: **`macos-houdini`**. Upstream is the ASWF-governed `OpenMoonRay` org
-(project moved from `dreamworksanimation` in 2026).
+Active branch: **`macos-houdini`** — now the **shared cross-OS Houdini branch** (name kept to
+avoid disrupting macOS iteration; an eventual rename to `houdini` is the clean end-state).
+The build infra is OS-separated *within* this one branch (`CMakeMacOSPresets.json` vs
+`CMakeLinuxPresets.json`, `building/macOS` vs `building/Rocky9`, `scripts/macOS` vs
+`scripts/Rocky9`, `docs/macos-houdini` vs `docs/rocky9-houdini`); the delegate C++ and DCC
+assets are genuinely shared. The user iterates on macOS; Linux follows. Upstream is the
+ASWF-governed `OpenMoonRay` org (project moved from `dreamworksanimation` in 2026).
 
 ## Fork / submodule architecture
 
@@ -68,6 +74,33 @@ Targeted delegate rebuild avoids the flaky full `install` target — see the ski
 `moonray_gui`/`arras_render`; the Arras *runtime* (`arras4_core`, `mcrt_*`, `execComp`) still
 builds, so the delegate render path is intact.
 
+## Building (Houdini) — Rocky 9 (headless, CPU-only render servers)
+
+Rooted at **`/opt/MoonRay`** (not `/Applications/MoonRay`); Houdini at `/opt/hfs20.5.939`.
+Full procedure in **`docs/rocky9-houdini/rocky9/rocky9-build.md`**; two Linux-specific issues
+in `docs/rocky9-houdini/rocky9/build-issues.md`. Render-verified end-to-end (incl. OIDN on
+CPU) on the `luma@` box, 2026-07-21. The one non-obvious gotcha (the Linux analogue of the
+macOS pxr-header dance):
+
+> The box installs Houdini via `/etc/profile.d/houdini-20.5.*.sh`, which forces `/opt/hfs*/
+> dsolib` onto every shell's `LD_LIBRARY_PATH`. Houdini's `dsolib` libcurl (dead CA path) and
+> libtiff (unversioned symbols) shadow the system libs and break the build. **Source
+> `docs/rocky9-houdini/rocky9/build-env.sh`** before every build/render step to scrub Houdini
+> out of the shell — nothing MoonRay builds needs it there (deps are `NO_USD`; husk +
+> delegate resolve their libs via RUNPATH).
+
+```bash
+source /opt/MoonRay/build-env.sh                                   # scrub Houdini from the shell
+cmake --preset rocky9-houdini-release                             # BUILD_QT_APPS=NO, BUILD_TESTING=OFF, MOONRAY_USE_OPTIX=NO
+cmake --build --preset rocky9-houdini-release -- -j $(nproc)
+cmake --build --preset rocky9-houdini-release --target install -- -j $(nproc)
+```
+
+Unlike macOS, Rocky 9 gets most deps from `dnf` — but **OpenVDB is source-built into
+`installs/`** (like macOS) specifically for the Houdini build, else Houdini's bundled OpenVDB
+11 headers shadow dnf's 9.1 (Issue L2). `MOONRAY_USE_OPTIX=NO` ⇒ `HDMOONRAY_NO_OPTIX` ⇒ the
+delegate auto-selects OIDN (CPU) and never hits the OptiX abort — the CPU-only payoff.
+
 ## Testing / debugging renders
 
 Use the **`render-test`** skill (husk + optional RDL2 dump). Key facts:
@@ -98,9 +131,15 @@ Use the **`render-test`** skill (husk + optional RDL2 dump). Key facts:
 
 `docs/macos-houdini/` — split into **`macos/`** (platform-specific: build log, dylib/toolkit
 scripts, build-fix patches) and **`general/`** (cross-platform Houdini work: delegate fixes,
-nodes, menu, shader mapping — reusable for a future Linux build). The `patches/` folders are
-a **historical** development record; the changes are already committed on the `macos-houdini`
-branches — you do not apply them to build.
+nodes, menu, shader mapping). The `patches/` folders are a **historical** development record;
+the changes are already committed on the `macos-houdini` branches — you do not apply them to
+build.
+
+`docs/rocky9-houdini/` — the Linux sibling, same split: **`rocky9/`** (platform-specific:
+`rocky9-build.md` build log, `build-issues.md` for the two Houdini-env-shadowing issues,
+`build-env.sh` shell scrub) and **`general/`** (`render-usd.sh` husk wrapper — the Linux port
+of the macOS one). Cross-platform delegate/node/shader work lives under `docs/macos-houdini/
+general/` and is not duplicated here.
 
 ## Conventions
 
