@@ -4,10 +4,14 @@
 install(FILES setup.sh
     DESTINATION scripts)
 
-# Cross-OS husk render helper — installed to bin/ as `render-usd` (executable).
+# Cross-OS husk render + denoise helpers — installed to bin/ (executable).
 install(PROGRAMS render-usd.sh
     DESTINATION bin
     RENAME render-usd)
+
+install(PROGRAMS render-denoise.sh
+    DESTINATION bin
+    RENAME render-denoise)
 
 install(FILES macOS/setupHoudini.sh
     DESTINATION scripts/macOS)
