@@ -1,27 +1,52 @@
 #!/bin/bash
-# render-usd.sh — render a Houdini-exported USD with MoonRay via husk.
+# render-usd (macOS) — husk render a USD with MoonRay. The repo counterpart of
+# the user's personal `moonusd` helper, kept in lock-step with the Rocky 9
+# `docs/rocky9-houdini/general/render-usd.sh`: same env vars and same husk args,
+# only the macOS paths differ (and there is no Houdini dsolib/LD_LIBRARY_PATH
+# poisoning to scrub on macOS — Houdini env is sourced deliberately here).
 #
-# Usage:  render-usd.sh <scene.usd[a]> [out.exr] [camera_prim_path] [frame]
-#   render-usd.sh scene.usda
-#   render-usd.sh scene.usda out.exr /cameras/render_cam 1
+# The husk args matter for more than convenience — notably **--complexity 1**,
+# which caps subdivision-surface tessellation. Without it husk uses the scene's
+# authored complexity (Solaris often writes `veryhigh`), which explodes subdiv
+# meshes into millions of polys and OOM-kills the MoonRay `mcrt` process during
+# renderPrep. --make-output-path creates the output dir; --threads -1 uses all
+# cores. Do NOT `source .../scripts/setup.sh` for husk — its PYTHONPATH prepends
+# the standalone USD bindings and crashes husk.
 #
-# Notes:
-#  - Uses the openmoonray-houdini install + Houdini's husk (Houdini USD 24.3).
-#  - Sets ONLY the vars husk needs. Do NOT `source .../scripts/setup.sh` for husk —
-#    its PYTHONPATH prepends the standalone USD 22.11 bindings and crashes husk.
-#  - $OMR/bin MUST be on PATH so Arras finds `execComp` (the host that runs the
-#    `mcrt` render computation); otherwise you get "failed to exec mcrt".
-#  - Set HDMOONRAY_RDLA_OUTPUT=/tmp/dump.rdla before running to dump the RDL2 scene
-#    MoonRay builds (handy for debugging what the delegate produced).
-set -uo pipefail
+# Usage: render-usd <usd-file> [start-frame] [num-frames] [frame-inc]
+#   render-usd head.usda             # frame 1
+#   render-usd head.usda 1001 24 1   # 24 frames from 1001
+#
+# Output: <usd-dir>/img/<name>/<name>.<F4>.exr  (dir auto-created).
+# Optional env:
+#   HDMOONRAY_RDLA_OUTPUT=/tmp/dump.rdla   dump the translated RDL2 scene
+#   HDMOONRAY_ENABLE_DENOISE=true          enable OIDN denoise
+#   OCIO=/path/to/aces/config.ocio         ACES color (unset = MoonRay default)
+#   OMR=... / HFS=...                      override install / Houdini locations
 
-SCENE="${1:?usage: render-usd.sh <scene.usd> [out.exr] [camera] [frame]}"
-OUT="${2:-${SCENE%.*}.exr}"
-CAM="${3:-}"
-FRAME="${4:-1}"
+args=$@
+if [[ -z "${args[@]}" ]]; then
+    echo "Usage: render-usd <usd-file> [start-frame] [num-frames] [frame-inc]"
+    exit 1
+fi
 
-OMR=/Applications/MoonRay/installs/openmoonray-houdini
-HFS=/Applications/Houdini/Houdini20.5.939/Frameworks/Houdini.framework/Versions/20.5/Resources
+usdfile=$1
+name=$(basename "$usdfile" .usda)
+folder=$(dirname "$usdfile")
+frame=${2:-1}
+end=${3:-1}
+inc=${4:-1}
+
+# Resolve the MoonRay-Houdini install. When this script lives in $OMR/bin (the
+# recommended home), derive $OMR from its own location so it is relocatable;
+# otherwise honor $OMR from the env or fall back to the standard install path.
+selfdir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+if [ -d "$selfdir/../rdl2dso" ] && [ -d "$selfdir/../plugin/pxr" ]; then
+    OMR="$(cd "$selfdir/.." && pwd)"
+else
+    OMR="${OMR:-/Applications/MoonRay/installs/openmoonray-houdini}"
+fi
+HFS="${HFS:-/Applications/Houdini/Houdini20.5.939/Frameworks/Houdini.framework/Versions/20.5/Resources}"
 HUSK="$HFS/bin/husk"
 
 export PATH="$OMR/bin:$PATH"                  # execComp + arras bins (fixes "exec mcrt")
@@ -31,11 +56,18 @@ export MOONRAY_CLASS_PATH="$OMR/shader_json"
 export REZ_MOONRAY_ROOT="$OMR"
 export ARRAS_SESSION_PATH="$OMR/sessions"
 export HOUDINI_PATH="$OMR/plugin/houdini;&"
+export HDMOONRAY_INFO="${HDMOONRAY_INFO:-1}"
+export HDMOONRAY_DOUBLESIDED="${HDMOONRAY_DOUBLESIDED:-1}"
+export HDMOONRAY_ENABLE_DENOISE="${HDMOONRAY_ENABLE_DENOISE:-0}"
 
-CAM_ARG=()
-[ -n "$CAM" ] && CAM_ARG=(--camera "$CAM")
-
-echo "husk -> $OUT  (frame $FRAME${CAM:+, camera $CAM})"
-# ${CAM_ARG[@]+...} guards the empty-array expansion: under `set -u`, macOS's default
-# bash 3.2 treats "${CAM_ARG[@]}" on an empty array as an unbound variable and aborts.
-exec "$HUSK" -R HdMoonrayRendererPlugin -o "$OUT" -f "$FRAME" ${CAM_ARG[@]+"${CAM_ARG[@]}"} "$SCENE"
+echo "husk -> $folder/img/$name/$name.<F4>.exr  (frame $frame, count $end, complexity 1)"
+exec "$HUSK" "$usdfile" \
+    --frame "$frame" \
+    --frame-count "$end" \
+    --frame-inc "$inc" \
+    --verbose a2 \
+    --renderer HdMoonrayRendererPlugin \
+    --make-output-path \
+    --complexity 1 \
+    --threads -1 \
+    --output "$folder/img/$name/$name.\$F4.exr"
